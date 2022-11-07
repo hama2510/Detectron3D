@@ -65,10 +65,24 @@ class Criterion(nn.Module):
         rotation_loss = self.smooth_l1_loss(pred['rotation'], target['rotation'])
         dir_loss = self.cross_entropy_loss(pred['dir'], target['dir'])
         velocity_loss = self.smooth_l1_loss(pred['velo'], target['velocity'])
-        return category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
-        
+#         return category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
+        return category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss
+    
     def forward(self, target, pred):
         total_loss = 0
+        loss_log = {}
         for stride in target.keys():
-            total_loss+=self.loss(pred, target, int(stride))
-        return total_loss
+            category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss = self.loss(pred, target, int(stride))
+            loss = category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
+            total_loss+=loss
+            loss_log[stride] = {
+                'category_loss': category_loss.cpu().detach().numpy(),
+                'attribute_loss': attribute_loss.cpu().detach().numpy(),
+                'offset_loss': offset_loss.cpu().detach().numpy(),
+                'depth_loss': depth_loss.cpu().detach().numpy(),
+                'size_loss': size_loss.cpu().detach().numpy(),
+                'rotation_loss': rotation_loss.cpu().detach().numpy(),
+                'dir_loss': dir_loss.cpu().detach().numpy(),
+                'centerness_loss': centerness_loss.cpu().detach().numpy(),
+            }
+        return total_loss, loss_log

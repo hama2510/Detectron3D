@@ -13,6 +13,9 @@ from utils.camera import *
 class NusceneDataset(Dataset):
     
     def __init__(self, data_file, config):
+        self.image_root = config.data.image_root
+        if not self.image_root.endswith('/'):
+            self.image_root+='/'
         self.data = pickle.load(open(data_file, 'rb'))
         self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
         self.visibility_thres = config.visibility_thres
@@ -28,7 +31,7 @@ class NusceneDataset(Dataset):
         
         sample = {}
         item = self.data[idx]
-        img = cv.imread(item['image'])
+        img = cv.imread(self.image_root+item['image'])
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         shape = [img.shape[0], img.shape[1]]
 
@@ -129,4 +132,4 @@ class NusceneDataset(Dataset):
                 'centerness':torch.FloatTensor(centerness_target),  'offset': torch.FloatTensor(offset_target), 
                 'depth': torch.FloatTensor(depth_target),  'size': torch.FloatTensor(size_target), 
                 'rotation': torch.FloatTensor(rotation_target), 'dir': torch.FloatTensor(dir_target), 'velocity': torch.FloatTensor(velocity_target)
-                }
+               }

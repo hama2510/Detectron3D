@@ -3,9 +3,10 @@ import torch.nn as nn
 from collections import OrderedDict
 
 class ResNet101(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, device, pretrained=True):
         super().__init__()
         self.model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet101', pretrained=pretrained)
+        self.model = self.model.to(device)
         self.channel_num = [512, 1024, 2048]
         
     def forward(self, x):

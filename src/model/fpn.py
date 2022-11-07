@@ -18,4 +18,5 @@ class FPN(nn.Module):
         outs['p5'] = x['feat2']        
         outs['p6'] = self.conv(outs['p5'])
         outs['p7'] = self.conv(outs['p6'])   
+        # print(outs['p3'].shape, outs['p4'].shape, outs['p5'].shape, outs['p6'].shape, outs['p7'].shape, )
         return outs

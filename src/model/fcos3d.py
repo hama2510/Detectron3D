@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from fpn import FPN
+from .fpn import FPN
 from collections import OrderedDict
 
 class FCOS3D(nn.Module):
-    def __init__(self, feature_extractor):
+    def __init__(self, feature_extractor, num_cate, num_attr):
         super().__init__()
         self.feature_extractor = feature_extractor
         self.fpn = FPN(self.feature_extractor.channel_num, 256)
-        self.cls_head = ClassificationHead(256, 10, (3,3), 1, 4)
+        self.cls_head = ClassificationHead(256, num_cate, num_attr, (3,3), 1, 4)
         self.regress_head = RegressionHead(256, (3,3), 1, 4)
 
     def forward(self, x):
@@ -40,40 +40,41 @@ class PredictionHead(nn.Module):
         return x
 
 class ClassificationHead(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, padding, num_conv):
+    def __init__(self, in_channel, num_cate, num_attr, kernel_size, padding, num_conv):
         super().__init__()
         self.convs = PredictionHead(in_channel, kernel_size, padding, num_conv)
-        self.conv_cls = nn.Conv2d(in_channel, out_channel, kernel_size, padding=padding)
-#             self.conv_attr = nn.conv(in_channel, out_channel, kernel_size, padding=padding)
+        self.conv_cate = nn.Conv2d(in_channel, num_cate, kernel_size, padding=padding)
+        self.conv_attr = nn.Conv2d(in_channel, num_attr, kernel_size, padding=padding)
 
     def forward(self, x):
         x = self.convs(x)
         outs = OrderedDict()
-        outs['cls'] = self.conv_cls(x)
-#             outs['attr'] = self.conv_attr(x)
+        outs['category'] = self.conv_cate(x)
+        outs['attribute'] = self.conv_attr(x)
         return outs
 
 class RegressionHead(nn.Module):
     def __init__(self, in_channel, kernel_size, padding, num_conv):
         super().__init__()
         self.convs = PredictionHead(in_channel, kernel_size, padding, num_conv)
+        self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU()
         self.conv_centerness = nn.Conv2d(in_channel, 1, kernel_size, padding=padding)
         self.conv_offset = nn.Conv2d(in_channel, 2, kernel_size, padding=padding)
         self.conv_depth = nn.Conv2d(in_channel, 1, kernel_size, padding=padding)
         self.conv_size = nn.Conv2d(in_channel, 3, kernel_size, padding=padding)
         self.conv_rotation = nn.Conv2d(in_channel, 1, kernel_size, padding=padding)
         self.conv_dir = nn.Conv2d(in_channel, 2, kernel_size, padding=padding)
+        self.conv_velo = nn.Conv2d(in_channel, 2, kernel_size, padding=padding)
 
     def forward(self, x):
         x = self.convs(x)
         outs = OrderedDict()
-        outs['centerness'] = self.conv_centerness(x)
+        outs['centerness'] = self.sigmoid(self.conv_centerness(x))
         outs['offset'] = self.conv_offset(x)
-        outs['depth'] = self.conv_depth(x)
-        outs['size'] = self.conv_size(x)
-        outs['rotation'] = self.conv_rotation(x)
+        outs['depth'] = self.relu(self.conv_depth(x))
+        outs['size'] = self.relu(self.conv_size(x))
+        outs['rotation'] = self.sigmoid(self.conv_rotation(x))
         outs['dir'] = self.conv_dir(x)
+        outs['velo'] = self.conv_velo(x)
         return outs
-    
-
-    

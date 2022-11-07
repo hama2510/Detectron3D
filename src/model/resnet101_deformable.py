@@ -1,7 +1,7 @@
 import torch
 import torchvision.ops
 from torch import nn
-from dcn import DeformableConv2d
+from .dcn import DeformableConv2d
 from collections import OrderedDict
 
 class ResidualBlock(nn.Module):

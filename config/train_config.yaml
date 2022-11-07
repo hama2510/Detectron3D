@@ -1,0 +1,25 @@
+device: cuda
+num_workers: 4
+epochs: 1000
+batch_size: 1
+lr: 1e-4
+save_best: true
+visibility_thres: 1
+# aug: false
+data:
+    meta_data: /home/kiennt/KienNT/research/data/nuScenes/pickle/train_val/meta.pkl
+    train: /home/kiennt/KienNT/research/data/nuScenes/pickle/train_val/train.pkl
+    val: /home/kiennt/KienNT/research/data/nuScenes/pickle/train_val/val.pkl
+models:
+  - 
+      model_name: mobilenet
+      eval: false
+      save_dir: /home/kiennt/KienNT/research/Detectron3D/exp/mobilenet
+  # - 
+  #     model_name: resnet101
+  #     eval: false
+  #     save_dir: /home/kiennt/KienNT/research/Detectron3D/exp/resnet101
+  # - 
+  #     model_name: resnet101_dcn
+  #     eval: false
+  #     save_dir: /home/kiennt/KienNT/research/Detectron3D/exp/resnet101

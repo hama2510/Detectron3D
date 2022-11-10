@@ -42,6 +42,28 @@ class TrainDetector(nn.Module):
                 name = k[6:] # remove `model.`
                 new_state_dict[name] = v
             self.model.load_state_dict(new_state_dict)
-            # self.model.load_state_dict(torch.load(self.config['load_model']))
         if self.config.model['eval']:
             self.model.eval()
+            
+class Predictor:
+    def __init__(self, config):
+        self.config = config
+        self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
+        
+    def transform_predict(self, pred):
+        boxes = []
+        for key in pred.keys():
+            level = int(key[1:])
+            stride = 2**level
+            category_map = pred['category'].cpu().detach().numpy()
+            attribute_map = pred['attribute'].cpu().detach().numpy()
+            centerness_map = pred['centerness'].cpu().detach().numpy()
+            offset_map = pred['offset'].cpu().detach().numpy()
+            size_map = pred['size'].cpu().detach().numpy()
+            rotation_map = pred['rotation'].cpu().detach().numpy()
+            dir_map = pred['dir'].cpu().detach().numpy()
+            velocity_map = pred['velo'].cpu().detach().numpy()
+            
+            cls_score = np.max(category_map, axis=1)
+            pred_score = cls_score*centerness_map
+            

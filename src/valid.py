@@ -1,26 +1,16 @@
-import pandas as pd
-import cv2 as cv
-import numpy as np
-import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
-from data.nuscene_dataset import NusceneDataset
-from model.detector import TrainDetector
-from criterion.losses import Criterion
-import argparse
-from omegaconf import OmegaConf
-import torch.optim as optim
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-import sys, os
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from nuscenes.nuscenes import NuScenes
+from nuscenes.eval.detection.evaluate import *
 
-def run_valid(dataloader_val, model):
-    for step, (imgs, y) in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
-#         for model_id in range(0, len(models)):
-#         model = models[model_id]['model']
-
-        imgs = imgs.to(config.device)
-        pred = model(imgs)
-        y = y.detach().cpu().numpy()
+class Evaluation:
+    def __init__(self, dataset_name, dataroot, eval_config, verbose=False):
+        self.nusc = NuScenes(version=dataset_name, dataroot=dataroot, verbose=verbose)
+        self.cfg_path = eval_config
+        self.output_dir = '/home/hotta/kiennt/Detectron3D/tmp/'
+        self.result_path = '/home/hotta/kiennt/Detectron3D/tmp/result_tmp.json'
         
+    def evaluate(self, pred, eval_set='val'):
+        nusc_eval = DetectionEval(self.nusc, config=eval_config, result_path=self.result_path, eval_set=eval_set, output_dir=self.output_dir, verbose=verbose)
+        metrics_summary = nusc_eval.main(plot_examples=0, render_curves=False)
+        return metrics_summary
+    
+      

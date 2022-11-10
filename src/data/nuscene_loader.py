@@ -1,4 +1,5 @@
 from nuscenes.nuscenes import NuScenes
+from nuscenes.utils.splits import create_splits_scenes
 import cv2 as cv
 import os, sys
 from scipy.spatial.transform import Rotation as quaternion_transformer
@@ -147,10 +148,12 @@ if __name__ == '__main__':
         os.makedirs(args.out)
 
     nusc = NuScenesLoader(dataset_name=args.dataset, dataroot=args.dataroot, num_worker=args.num_worker, verbose=True)
+    splits = create_splits_scenes()
     train_data = []
     val_data = []
     scenes = nusc.get_all_scenes()
-    train_scenes, val_scenes = train_test_split(scenes, random_state=42, test_size=0.2)
+    train_scenes = [item for item in scenes if item['name'] in splits['train']]
+    val_scenes = [item for item in scenes if item['name'] in splits['val']]
     for scene in tqdm(train_scenes):
         # print('Hanlding scene %s'%scene['name'])
         train_data.extend(nusc.get_samples_from_scene(scene))

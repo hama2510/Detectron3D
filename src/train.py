@@ -130,5 +130,5 @@ if __name__ == '__main__':
                     f.write('{},'.format(np.mean(models[model_id]['loss'][stride][key])))
             f.write('{},{},{},{},{}\n'.format(epoch, np.mean(models[model_id]['loss']['total']), f1, precision, recall))
             f.close()
-            print('epoch={},model={},loss={},f1={},precision={},recall={}'.format(epoch, model_config.model.model_name, np.mean(models[model_id]['loss']), np.round(f1, decimals=2), np.round(precision, decimals=2), np.round(recall, decimals=2)))
+            print('epoch={},model={},loss={},f1={},precision={},recall={}'.format(epoch, model_config.model.model_name, np.mean(models[model_id]['loss']['total']), np.round(f1, decimals=2), np.round(precision, decimals=2), np.round(recall, decimals=2)))
         

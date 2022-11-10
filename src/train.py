@@ -52,7 +52,7 @@ if __name__ == '__main__':
         model_config.model = model_config.models[model_id]
         model = TrainDetector(model_config)
         optimizer = optim.Adam(model.parameters(), lr=config.lr)
-        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'y_true':[], 'y_pred':[], 'best_f1':0, 'loss':init_loss_log()})
+        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss':init_loss_log()})
     
         if not os.path.exists(models[model_id]['config'].model.save_dir):
             os.makedirs(models[model_id]['config'].model.save_dir)
@@ -90,45 +90,31 @@ if __name__ == '__main__':
                         models[model_id]['loss'][stride][key].append(loss_log[stride][key])
 
 #         # valid
-#         for step, (imgs, y) in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
-#             for model_id in range(0, len(models)):
-#                 model = models[model_id]['model']
+        for step, (sample_token, imgs, _) in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
+            for model_id in range(0, len(models)):
+                model = models[model_id]['model']
+                imgs = imgs.to(config.device)
+                models[model_id]['y_true'].extend(y)
+                pred = model(imgs).detach().cpu().numpy()
+                models[model_id]['pred'].extend({'sample_token': sample_token, 'pred':pred})
 
-#                 imgs = imgs.to(config.device)
-#                 y = y.detach().cpu().numpy()
-#                 y = np.argmax(y, axis=1).tolist()
-#                 models[model_id]['y_true'].extend(y)
-#                 pred = model(imgs).detach().cpu().numpy()
-#                 pred = np.argmax(pred, axis=1).tolist()
-#                 models[model_id]['y_pred'].extend(pred)
-
-#         for model_id in range(0, len(models)):
-#             y_true = models[model_id]['y_true']
-#             y_pred = models[model_id]['y_pred']
-#             model_config = models[model_id]['config']
-
-#             weight = dataset_val.get_weight(weight_type='val')
-#             sample_weight = [weight[item] for item in y_true]
-#             precision = precision_score(y_true, y_pred, sample_weight=sample_weight, average=None, zero_division=0)
-#             precision = np.mean(precision)
-#             recall = recall_score(y_true, y_pred, sample_weight=sample_weight, average=None)
-#             recall = np.mean(recall)
-#             f1 = 2.0*precision*recall/(precision+recall)
-#             if f1>models[model_id]['best_f1']:
-#                 models[model_id]['best_f1']=f1
+        for model_id in range(0, len(models)):
+            pred = models[model_id]['pred']
+            nds = 1
+            models[model_id]['pred'] = []
+            if config.save_best:
+                if nds>=models[model_id]['best_score']:
+                    torch.save(model.state_dict(), os.path.join(model_config.save_dir, 'best_model.pth'))
+            else:
+                torch.save(model.state_dict(), os.path.join(model_config.save_dir, 'model_{}.pth'.format(epoch)))
+            if nds>models[model_id]['best_score']:
+                models[model_id]['best_score'] = nds
                 
-#             if config.save_best:
-#                 if f1>=models[model_id]['best_f1']:
-#                     # torch.save(model.state_dict(), os.path.join(config.save_dir, 'model_{}.pth'.format(epoch)))
-#                     torch.save(model.state_dict(), os.path.join(model_config.save_dir, 'best_model.pth'))
-#             else:
-#                 torch.save(model.state_dict(), os.path.join(model_config.save_dir, 'model_{}.pth'.format(epoch)))
-
             f = open(os.path.join(model_config.save_dir, 'log.csv'), 'a')
             for stride in models[model_id]['loss']:
                 for key in models[model_id]['loss'][stride].keys():
                     f.write('{},'.format(np.mean(models[model_id]['loss'][stride][key])))
             f.write('{},{},{},{},{}\n'.format(epoch, np.mean(models[model_id]['loss']['total']), f1, precision, recall))
             f.close()
-            print('epoch={},model={},loss={},f1={},precision={},recall={}'.format(epoch, model_config.model.model_name, np.mean(models[model_id]['loss']['total']), np.round(f1, decimals=2), np.round(precision, decimals=2), np.round(recall, decimals=2)))
+            print('epoch={},model={},loss={},nds={}'.format(epoch, model_config.model.model_name, np.mean(models[model_id]['loss']['total']), np.round(nds, decimals=2))
         

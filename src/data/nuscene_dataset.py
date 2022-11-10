@@ -36,6 +36,7 @@ class NusceneDataset(Dataset):
         shape = [img.shape[0], img.shape[1]]
 
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
+        sample['sample_token'] = item['sample_token']
         sample['img'] = img
 
         sample['target'] = {}

@@ -75,7 +75,6 @@ class NuScenesLoader:
                     'visibility': self.read_visibility(ann_metadata['visibility_token'])
                 })
                 data[data_path]['anns'].append(ann)
-
         data = [{'scene':sample['scene_token'], 'sample_token': sample['token'], 'image':os.path.abspath(key), 'calibration_matrix':data[key]['calibration_matrix'], 
                  'annotations':data[key]['anns'], } for key in data.keys()]
         return data

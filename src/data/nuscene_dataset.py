@@ -31,7 +31,8 @@ class NusceneDataset(Dataset):
         
         sample = {}
         item = self.data[idx]
-        img = cv.imread(self.image_root+item['image'])
+#         img = cv.imread(self.image_root+item['image'])
+        img = cv.imread(item['image'])
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         shape = [img.shape[0], img.shape[1]]
 

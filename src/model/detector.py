@@ -30,6 +30,8 @@ class TrainDetector(nn.Module):
         else:
             print('Not support model {}'.format(config.model.model_name))
             exit()
+        if self.config['multi_gpu']:
+            model = nn.DataParallel(model)
         model.to(self.config['device'])
         return model
      
@@ -66,4 +68,3 @@ class Predictor:
             
             cls_score = np.max(category_map, axis=1)
             pred_score = cls_score*centerness_map
-            

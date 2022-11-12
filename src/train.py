@@ -103,7 +103,7 @@ if __name__ == '__main__':
                 break
 
         for model_id in range(0, len(models)):
-            pred = models[model_id]['pred']
+            pred = models[model_id]['model'].transform_predict(models[model_id]['pred'])
 #             nds = 1
 #             models[model_id]['pred'] = []
 #             if config.save_best:

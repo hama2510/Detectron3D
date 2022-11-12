@@ -97,10 +97,13 @@ if __name__ == '__main__':
             for model_id in range(0, len(models)):
                 model = models[model_id]['model']
                 pred = model(imgs)
-#                 models[model_id]['pred'].extend({'sample_token': sample_token, 'pred':pred})
+                pred = [{'sample_token': sample_token[i], 'pred':pred[i]} for i in range(len(sample_token))]
+                    models[model_id]['pred'].extend(pred)
+            if step>3:
+                break
 
-#         for model_id in range(0, len(models)):
-#             pred = models[model_id]['pred']
+        for model_id in range(0, len(models)):
+            pred = models[model_id]['pred']
 #             nds = 1
 #             models[model_id]['pred'] = []
 #             if config.save_best:

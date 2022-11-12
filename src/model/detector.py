@@ -46,12 +46,7 @@ class TrainDetector(nn.Module):
             self.model.load_state_dict(new_state_dict)
         if self.config.model['eval']:
             self.model.eval()
-            
-class Predictor:
-    def __init__(self, config):
-        self.config = config
-        self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
-        
+
     def transform_predict(self, pred):
         boxes = []
         for key in pred.keys():
@@ -68,3 +63,25 @@ class Predictor:
             
             cls_score = np.max(category_map, axis=1)
             pred_score = cls_score*centerness_map
+            
+# class Predictor:
+#     def __init__(self, config):
+#         self.config = config
+#         self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
+        
+#     def transform_predict(self, pred):
+#         boxes = []
+#         for key in pred.keys():
+#             level = int(key[1:])
+#             stride = 2**level
+#             category_map = pred['category'].cpu().detach().numpy()
+#             attribute_map = pred['attribute'].cpu().detach().numpy()
+#             centerness_map = pred['centerness'].cpu().detach().numpy()
+#             offset_map = pred['offset'].cpu().detach().numpy()
+#             size_map = pred['size'].cpu().detach().numpy()
+#             rotation_map = pred['rotation'].cpu().detach().numpy()
+#             dir_map = pred['dir'].cpu().detach().numpy()
+#             velocity_map = pred['velo'].cpu().detach().numpy()
+            
+#             cls_score = np.max(category_map, axis=1)
+#             pred_score = cls_score*centerness_map

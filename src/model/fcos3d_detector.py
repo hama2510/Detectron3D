@@ -6,6 +6,10 @@ from .mobilenet_v2 import MobileNetv2
 from .resnet101 import ResNet101
 from .resnet101_deformable import ResNet101DCN
 import pickle
+from pyquaternion import Quaternion
+sys.path.append('..')
+from utils.nms import rotated_nms
+
 
 class FCOSDetector(nn.Module):
     def __init__(self, config):
@@ -67,7 +71,6 @@ class FCOSDetector(nn.Module):
             
             cls_score = np.max(category_map, axis=0)
             pred_score = cls_score*centerness_map
-            print(pred_score.shape)
             indices = np.argwhere(pred_score>thres)
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
@@ -77,39 +80,23 @@ class FCOSDetector(nn.Module):
                 size = np.exp(size_map[:][idx[0]][idx[1]])
                 rotation = rotation_map[0][idx[0]][idx[1]]
                 dir = dir_map[0][idx[0]][idx[1]]
-                rotation = 
+                if dir<0.5:
+                    rotation = -rotation
                 velocity = velocity_map[0][idx[0]][idx[1]]
                 category = self.meta_data['category'][np.argmax(category_map[0][idx[0]][idx[1]])]
                 attribute = self.meta_data['attribute'][np.argmax(attribute_map[0][idx[0]][idx[1]])]
                 
                 boxes.append({
+                    'sample_token': sample_token
                     'translation': coord_3d,
                     'size': size,
-                    'rotation': rotation,
+                    'rotation': Quaternion(axis=[1, 0, 0], angle=rotation),
+                    'rotation_angle': rotation,
                     'velocity': velocity,
                     'detection_name': category,
                     'detection_score': sc,
-                    'attribute_name': attribute
+                    'attribute_name': attribute,
                 })
-                
-# class Predictor:
-#     def __init__(self, config):
-#         self.config = config
-#         self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
-        
-#     def transform_predict(self, pred):
-#         boxes = []
-#         for key in pred.keys():
-#             level = int(key[1:])
-#             stride = 2**level
-#             category_map = pred['category'].cpu().detach().numpy()
-#             attribute_map = pred['attribute'].cpu().detach().numpy()
-#             centerness_map = pred['centerness'].cpu().detach().numpy()
-#             offset_map = pred['offset'].cpu().detach().numpy()
-#             size_map = pred['size'].cpu().detach().numpy()
-#             rotation_map = pred['rotation'].cpu().detach().numpy()
-#             dir_map = pred['dir'].cpu().detach().numpy()
-#             velocity_map = pred['velo'].cpu().detach().numpy()
-            
-#             cls_score = np.max(category_map, axis=1)
-#             pred_score = cls_score*centerness_map
+        keep_indices = rotated_nms(boxes, calib_matrix)
+        boxes = [boxes[i] for i in keep_indices]
+        return boxes

@@ -98,3 +98,7 @@ def distance_to_center(point, box):
 
 def cal_area(box):
     return box[1]*box[2]
+
+def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
+    return [0, 1, 2]
+    

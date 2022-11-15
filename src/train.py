@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from data.nuscene_dataset import NusceneDataset
-from model.detector import TrainDetector
+from model.fcos3d_detector import FCOSDetector
 from criterion.losses import Criterion
 import argparse
 from omegaconf import OmegaConf
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     for model_id, item in enumerate(config.models):
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
-        model = TrainDetector(model_config)
+        model = FCOSDetector(model_config)
         optimizer = optim.Adam(model.parameters(), lr=config.lr)
         models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss':init_loss_log()})
     
@@ -93,17 +93,24 @@ if __name__ == '__main__':
             imgs = samples['img']
             imgs = imgs.to(config.device)
             sample_token = samples['sample_token']
+            calibration_matrix = samples['calibration_matrix']
             
             for model_id in range(0, len(models)):
                 model = models[model_id]['model']
                 pred = model(imgs)
-                pred = [{'sample_token': sample_token[i], 'pred':pred[i]} for i in range(len(sample_token))]
-                    models[model_id]['pred'].extend(pred)
+                arr = []
+                for i in range(len(sample_token)):
+                    item = {'sample_token':sample_token[i], 'calibration_matrix':calibration_matrix[i], 'pred':{}}
+                    for key in pred.keys():
+                        item['pred'][key]={}
+                        for sub_key in pred[key].keys():
+                            item['pred'][key][sub_key] = pred[key][sub_key][i].detach().cpu().numpy()
+                    models[model_id]['pred'].append(item)
             if step>3:
                 break
 
         for model_id in range(0, len(models)):
-            pred = models[model_id]['model'].transform_predict(models[model_id]['pred'])
+            pred = models[model_id]['model'].transform_predict(models[model_id]['pred'][0])
 #             nds = 1
 #             models[model_id]['pred'] = []
 #             if config.save_best:

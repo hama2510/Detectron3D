@@ -29,7 +29,6 @@ class NusceneDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-        sample = {}
         item = self.data[idx]
 #         img = cv.imread(self.image_root+item['image'])
         img = cv.imread(item['image'])
@@ -37,10 +36,8 @@ class NusceneDataset(Dataset):
         shape = [img.shape[0], img.shape[1]]
 
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
-        sample['sample_token'] = item['sample_token']
-        sample['img'] = img
-
-        sample['target'] = {}
+        
+        sample = {'sample_token':item['sample_token'], 'calibration_matrix':item['calibration_matrix'], 'img':img, 'target':{}}
         for stride in self.stride_list:
             sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride)
         return sample

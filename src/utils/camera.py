@@ -101,11 +101,11 @@ def cal_area(box):
 
 def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
-    coord_2d = np.asarry(coord_2d)
-    intrinsic_inverse = numpy.linalg.inv(intrinsic)
+    coord_2d = np.asarray(coord_2d)
+    intrinsic_inverse = np.linalg.inv(intrinsic)
     coord_2d = np.append(coord_2d, 1)
     coord_3d = depth * intrinsic_inverse @ coord_2d
-    coord_3d = (coord_3d / coord_3d[[-1]])[:3].T.astype(int)
+    coord_3d = (coord_3d / coord_3d[[-1]])[:3].T
     return coord_3d
 
 

@@ -7,9 +7,10 @@ from .resnet101 import ResNet101
 from .resnet101_deformable import ResNet101DCN
 import pickle
 from pyquaternion import Quaternion
+import sys
 sys.path.append('..')
 from utils.nms import rotated_nms
-
+from utils.camera import coord_2d_to_3d
 
 class FCOSDetector(nn.Module):
     def __init__(self, config):
@@ -73,24 +74,27 @@ class FCOSDetector(nn.Module):
             pred_score = cls_score*centerness_map
             indices = np.argwhere(pred_score>thres)
             for idx in indices:
-                sc = pred_score[idx[0], idx[1]]
+                sc = pred_score[0][idx[0], idx[1]]
                 x, y = int(idx[0]+offset_map[0][idx[0]][idx[1]])*stride, int(idx[1]+offset_map[1][idx[0]][idx[1]])*stride
                 depth = np.exp(depth_map[0][idx[0]][idx[1]])
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)
-                size = np.exp(size_map[:][idx[0]][idx[1]])
+                size = size_map[:,idx[0],idx[1]]
                 rotation = rotation_map[0][idx[0]][idx[1]]
                 dir = dir_map[0][idx[0]][idx[1]]
                 if dir<0.5:
                     rotation = -rotation
-                velocity = velocity_map[0][idx[0]][idx[1]]
-                category = self.meta_data['category'][np.argmax(category_map[0][idx[0]][idx[1]])]
-                attribute = self.meta_data['attribute'][np.argmax(attribute_map[0][idx[0]][idx[1]])]
+                velocity = velocity_map[:,idx[0],idx[1]]
+                category = self.meta_data['categories'][np.argmax(category_map[0][idx[0]][idx[1]])]
+                if category in ['barrier', 'traffic_cone']:
+                    attribute = ''
+                else:
+                    attribute = self.meta_data['attributes'][np.argmax(attribute_map[0][idx[0]][idx[1]])]
                 
                 boxes.append({
-                    'sample_token': sample_token
+                    'sample_token': sample_token,
                     'translation': coord_3d,
                     'size': size,
-                    'rotation': Quaternion(axis=[1, 0, 0], angle=rotation),
+                    'rotation': Quaternion(axis=[1, 0, 0], angle=rotation).elements,
                     'rotation_angle': rotation,
                     'velocity': velocity,
                     'detection_name': category,
@@ -100,3 +104,10 @@ class FCOSDetector(nn.Module):
         keep_indices = rotated_nms(boxes, calib_matrix)
         boxes = [boxes[i] for i in keep_indices]
         return boxes
+    
+    def transform_predicts(self, preds, thres=0.05):
+        boxes = []
+        for pred in preds:
+            boxes.extend(self.transform_predict(pred, thres))
+        return boxes
+    

@@ -13,7 +13,8 @@ import torch.optim as optim
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import sys, os
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from valid import Evaluation
+# from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 torch.manual_seed(42)
 
@@ -44,6 +45,7 @@ if __name__ == '__main__':
     dataset_val = NusceneDataset(config.data.val, config=config)
     dataloader_val = DataLoader(dataset_val, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     criterion = Criterion(device=config.device)
+    evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
 
     models = []
     for model_id, item in enumerate(config.models):
@@ -94,23 +96,27 @@ if __name__ == '__main__':
             imgs = imgs.to(config.device)
             sample_token = samples['sample_token']
             calibration_matrix = samples['calibration_matrix']
-            
             for model_id in range(0, len(models)):
                 model = models[model_id]['model']
                 pred = model(imgs)
                 arr = []
                 for i in range(len(sample_token)):
-                    item = {'sample_token':sample_token[i], 'calibration_matrix':calibration_matrix[i], 'pred':{}}
+                    calib_matrix = {}
+                    for key in calibration_matrix.keys():
+                        calib_matrix[key] = calibration_matrix[key][i].detach().cpu().numpy()
+                    item = {'sample_token':sample_token[i], 'calibration_matrix':calib_matrix, 'pred':{}}
                     for key in pred.keys():
                         item['pred'][key]={}
                         for sub_key in pred[key].keys():
                             item['pred'][key][sub_key] = pred[key][sub_key][i].detach().cpu().numpy()
                     models[model_id]['pred'].append(item)
-            if step>3:
-                break
+#             if step>3:
+#                 break
 
         for model_id in range(0, len(models)):
-            pred = models[model_id]['model'].transform_predict(models[model_id]['pred'][0])
+            preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
+            metrics_summary = evaluation.evaluate(preds, eval_set='mini_val')
+            print(metrics_summary)
 #             nds = 1
 #             models[model_id]['pred'] = []
 #             if config.save_best:

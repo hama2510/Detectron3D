@@ -8,7 +8,7 @@ from functools import partial
 from multiprocessing import Pool
 import pickle
 import argparse
-from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import train_test_split
 sys.path.append('..')
 from utils.camera import *
 from tqdm import tqdm
@@ -23,13 +23,13 @@ class NuScenesLoader:
         pose_record = self.nusc.get('ego_pose', sd_record['ego_pose_token'])
         cs_record = self.nusc.get('calibrated_sensor', sd_record['calibrated_sensor_token'])
         return dict({
-            'sensor_R_quaternion': cs_record['rotation'],
-            'sensor_R': quaternion_transformer.from_quat(cs_record['rotation']).as_matrix(),
-            'sensor_t': cs_record['translation'],
-            'ego_R_quaternion': pose_record['rotation'],
-            'ego_R': quaternion_transformer.from_quat(pose_record['rotation']).as_matrix(),
-            'ego_t': pose_record['translation'],
-            'camera_intrinsic': cs_record['camera_intrinsic']
+            'sensor_R_quaternion': np.asarray(cs_record['rotation']),
+            'sensor_R': np.asarray(quaternion_transformer.from_quat(cs_record['rotation']).as_matrix()),
+            'sensor_t': np.asarray(cs_record['translation']),
+            'ego_R_quaternion': np.asarray(pose_record['rotation']),
+            'ego_R': np.asarray(quaternion_transformer.from_quat(pose_record['rotation']).as_matrix()),
+            'ego_t': np.asarray(pose_record['translation']),
+            'camera_intrinsic': np.asarray(cs_record['camera_intrinsic'])
         })
 
     def read_attribute(self, attr_tokens):
@@ -151,8 +151,14 @@ if __name__ == '__main__':
     train_data = []
     val_data = []
     scenes = nusc.get_all_scenes()
-    train_scenes = [item for item in scenes if item['name'] in splits['train']]
-    val_scenes = [item for item in scenes if item['name'] in splits['val']]
+    if 'mini' in args.dataset:
+        train_key='mini_train'
+        val_key = 'mini_val'
+    else:
+        train_key='train'
+        val_key = 'val'
+    train_scenes = [item for item in scenes if item['name'] in splits[train_key]]
+    val_scenes = [item for item in scenes if item['name'] in splits[val_key]]
     for scene in tqdm(train_scenes):
         # print('Hanlding scene %s'%scene['name'])
         train_data.extend(nusc.get_samples_from_scene(scene))

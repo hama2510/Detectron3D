@@ -64,7 +64,7 @@ class Criterion(nn.Module):
         size_loss = self.smooth_l1_loss(pred['size'], target['size'])
         rotation_loss = self.smooth_l1_loss(pred['rotation'], target['rotation'])
         dir_loss = self.cross_entropy_loss(pred['dir'], target['dir'])
-        velocity_loss = self.smooth_l1_loss(pred['velo'], target['velocity'])
+        velocity_loss = self.smooth_l1_loss(pred['velocity'], target['velocity'])
 #         return category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
         return category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss
     

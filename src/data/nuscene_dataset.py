@@ -29,7 +29,6 @@ class NusceneDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-        sample = {}
         item = self.data[idx]
 #         img = cv.imread(self.image_root+item['image'])
         img = cv.imread(item['image'])
@@ -37,10 +36,7 @@ class NusceneDataset(Dataset):
         shape = [img.shape[0], img.shape[1]]
 
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
-        sample['sample_token'] = item['sample_token']
-        sample['img'] = img
-
-        sample['target'] = {}
+        sample = {'sample_token':item['sample_token'], 'calibration_matrix':item['calibration_matrix'], 'img':img, 'target':{}}
         for stride in self.stride_list:
             sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride)
         return sample
@@ -89,8 +85,8 @@ class NusceneDataset(Dataset):
     def centerness(self, point, box, alpha=2.5):
         return np.exp(-alpha*((point[0]-box[0][0])**2+(point[1]-box[0][1])**2))
 
-    def offset(self, point, box):
-        return [point[0]-box[0][0], point[1]-box[0][1]]
+    def offset(self, point, box, stride):
+        return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
 
     def gen_target(self, anns, shape, stride):
         shape =  [int(np.ceil(shape[0]/stride)), int(np.ceil(shape[1]/stride))]
@@ -123,7 +119,7 @@ class NusceneDataset(Dataset):
                     category_target[x,y,:] = category_onehot
                     attribute_target[x,y,:] = self.gen_attribute_onehot(box['attribute'])
                     centerness_target[x,y,:] = self.centerness([x,y], box_2d)
-                    offset_target[x,y,:] = self.offset([x,y], box_2d)
+                    offset_target[x,y,:] = self.offset([x,y], box['box_2d'], stride)
                     depth_target[x,y,:] = box['xyz_in_sensor_coor'][2]
                     size_target[x,y,:] = box['box_size']
                     rotation_target[x,y,:] = rad

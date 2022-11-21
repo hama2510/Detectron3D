@@ -76,5 +76,5 @@ class RegressionHead(nn.Module):
         outs['size'] = self.relu(self.conv_size(x))
         outs['rotation'] = self.sigmoid(self.conv_rotation(x))
         outs['dir'] = self.conv_dir(x)
-        outs['velo'] = self.conv_velo(x)
+        outs['velocity'] = self.conv_velo(x)
         return outs

@@ -10,7 +10,7 @@ from pyquaternion import Quaternion
 import sys
 sys.path.append('..')
 from utils.nms import rotated_nms
-from utils.camera import coord_2d_to_3d
+from utils.camera import coord_2d_to_3d, sensor_coord_to_real_coord
 
 class FCOSDetector(nn.Module):
     def __init__(self, config):
@@ -57,8 +57,8 @@ class FCOSDetector(nn.Module):
         sample_token = pred['sample_token']
         calib_matrix = pred['calibration_matrix']
         for key in pred['pred'].keys():
-            level = int(key[1:])
-            stride = 2**level
+#             stride = int(key)
+            stride = 2**int(key[1:])
             
             category_map = pred['pred'][key]['category']
             attribute_map = pred['pred'][key]['attribute']
@@ -68,33 +68,48 @@ class FCOSDetector(nn.Module):
             size_map = pred['pred'][key]['size']
             rotation_map = pred['pred'][key]['rotation']
             dir_map = pred['pred'][key]['dir']
-            velocity_map = pred['pred'][key]['velo']
+            velocity_map = pred['pred'][key]['velocity']
             
-            cls_score = np.max(category_map, axis=0)
-            pred_score = cls_score*centerness_map
+            category_map = np.moveaxis(category_map, 0, -1)
+            attribute_map = np.moveaxis(attribute_map, 0, -1)
+            centerness_map = np.moveaxis(centerness_map, 0, -1)
+            offset_map = np.moveaxis(offset_map, 0, -1)
+            depth_map = np.moveaxis(depth_map, 0, -1)
+            size_map = np.moveaxis(size_map, 0, -1)
+            rotation_map = np.moveaxis(rotation_map, 0, -1)
+            dir_map = np.moveaxis(dir_map, 0, -1)
+            velocity_map = np.moveaxis(velocity_map, 0, -1)
+            
+            cls_score = np.max(category_map, axis=2)
+            pred_score = cls_score*centerness_map[:,:,0]
             indices = np.argwhere(pred_score>thres)
+            indices = np.unique(indices, axis=0)
             for idx in indices:
-                sc = pred_score[0][idx[0], idx[1]]
-                x, y = int(idx[0]+offset_map[0][idx[0]][idx[1]])*stride, int(idx[1]+offset_map[1][idx[0]][idx[1]])*stride
-                depth = np.exp(depth_map[0][idx[0]][idx[1]])
+                sc = pred_score[idx[0], idx[1]]
+                x, y = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
+                depth = np.exp(depth_map[idx[0]][idx[1],0])
+#                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)
-                size = size_map[:,idx[0],idx[1]]
-                rotation = rotation_map[0][idx[0]][idx[1]]
-                dir = dir_map[0][idx[0]][idx[1]]
-                if dir<0.5:
+                size = size_map[idx[0],idx[1],:]
+                rotation = rotation_map[idx[0],idx[1],0]*np.pi
+                dir = np.argmax(dir_map[idx[0],idx[1],:])
+                if dir==0:
                     rotation = -rotation
-                velocity = velocity_map[:,idx[0],idx[1]]
-                category = self.meta_data['categories'][np.argmax(category_map[0][idx[0]][idx[1]])]
-                if category in ['barrier', 'traffic_cone']:
+                rotation_q = Quaternion(axis=[0, 0, 1], angle=rotation)
+                velocity = velocity_map[idx[0],idx[1],:]
+                category = self.meta_data['categories'][np.argmax(category_map[idx[0],idx[1],:])]
+                if category in ['barrier', 'traffic_cone'] :
                     attribute = ''
                 else:
-                    attribute = self.meta_data['attributes'][np.argmax(attribute_map[0][idx[0]][idx[1]])]
-                
+                    attribute = self.meta_data['attributes'][np.argmax(attribute_map[idx[0],idx[1],:])]
+                    if attribute=='void':
+                        attribute = ''
+                        
                 boxes.append({
                     'sample_token': sample_token,
-                    'translation': coord_3d,
+                    'translation': sensor_coord_to_real_coord(coord_3d, size, rotation_q, calib_matrix),
                     'size': size,
-                    'rotation': Quaternion(axis=[1, 0, 0], angle=rotation).elements,
+                    'rotation': rotation_q.elements,
                     'rotation_angle': rotation,
                     'velocity': velocity,
                     'detection_name': category,

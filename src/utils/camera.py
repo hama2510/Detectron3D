@@ -1,48 +1,10 @@
 import cv2 as cv
 import os
-from scipy.spatial.transform import Rotation as quaternion_transformer
+from pyquaternion import Quaternion
+# from scipy.spatial.transform import Rotation as quaternion_transformer
 import numpy as np
 from nuscenes.utils.geometry_utils import view_points
-
-def quaternion_to_rotation_matrix(Q):
-    q0 = Q[0]
-    q1 = Q[1]
-    q2 = Q[2]
-    q3 = Q[3]
-    # r00 = 2 * (q0 * q0 + q1 * q1) - 1
-    # r01 = 2 * (q1 * q2 - q0 * q3)
-    # r02 = 2 * (q1 * q3 + q0 * q2)
-    # r10 = 2 * (q1 * q2 + q0 * q3)
-    # r11 = 2 * (q0 * q0 + q2 * q2) - 1
-    # r12 = 2 * (q2 * q3 - q0 * q1)
-    # r20 = 2 * (q1 * q3 - q0 * q2)
-    # r21 = 2 * (q2 * q3 + q0 * q1)
-    # r22 = 2 * (q0 * q0 + q3 * q3) - 1
-    r00 = - (2 * (q2 * q2 + q3 * q3) - 1)
-    r01 = 2 * (q1 * q2 - q0 * q3)
-    r02 = 2 * (q1 * q3 + q0 * q2)
-    r10 = 2 * (q1 * q2 + q0 * q3)
-    r11 = - (2 * (q1 * q1 + q3 * q3) - 1)
-    r12 = 2 * (q2 * q3 - q0 * q1)
-    r20 = 2 * (q1 * q3 - q0 * q2)
-    r21 = 2 * (q2 * q3 + q0 * q1)
-    r22 = - (2 * (q1 * q1 + q2 * q2) - 1)
-    # s = Q[0]
-    # x = Q[1]
-    # y = Q[2]
-    # z = Q[3]
-    # r00 = 1 - 2*y**2 - 2*z**2
-    # r01 = 2 * (q1 * q2 - q0 * q3)
-    # r02 = 2 * (q1 * q3 + q0 * q2)
-    # r10 = 2 * (q1 * q2 + q0 * q3)
-    # r11 = 2 * (q0 * q0 + q2 * q2) - 1
-    # r12 = 2 * (q2 * q3 - q0 * q1)
-    # r20 = 2 * (q1 * q3 - q0 * q2)
-    # r21 = 2 * (q2 * q3 + q0 * q1)
-    # r22 = 2 * (q0 * q0 + q3 * q3) - 1
-    return np.array([[r00, r01, r02],
-                        [r10, r11, r12],
-                        [r20, r21, r22]])
+from nuscenes.utils.data_classes import Box
 
 def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t):
     sensor_extrinsic = np.concatenate([
@@ -101,12 +63,19 @@ def cal_area(box):
 
 def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
+    intrinsic, _, _ = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t)
     coord_2d = np.asarray(coord_2d)
+    coord_2d = np.append(coord_2d, [1, 1/depth])
     intrinsic_inverse = np.linalg.inv(intrinsic)
-    coord_2d = np.append(coord_2d, 1)
-    coord_3d = depth * intrinsic_inverse @ coord_2d
-    coord_3d = (coord_3d / coord_3d[[-1]])[:3].T
+    coord_3d = depth * (intrinsic_inverse @ coord_2d)
+    coord_3d = coord_3d[:3].T
     return coord_3d
 
-
-    
+def sensor_coord_to_real_coord(coord, size, rotation, calibration_matrix):
+    sensor_R_quaternion, sensor_t, ego_R_quaternion, ego_t = calibration_matrix['sensor_R_quaternion'], calibration_matrix['sensor_t'], calibration_matrix['ego_R_quaternion'], calibration_matrix['ego_t']
+    box = Box(coord, size, rotation)
+    box.rotate(Quaternion(sensor_R_quaternion))
+    box.translate(np.array(sensor_t))
+    box.rotate(Quaternion(ego_R_quaternion))
+    box.translate(np.array(ego_t))
+    return box.center

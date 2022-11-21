@@ -2,7 +2,8 @@ from nuscenes.nuscenes import NuScenes
 from nuscenes.utils.splits import create_splits_scenes
 import cv2 as cv
 import os, sys
-from scipy.spatial.transform import Rotation as quaternion_transformer
+from pyquaternion import Quaternion
+# from scipy.spatial.transform import Rotation as quaternion_transformer
 import numpy as np
 from functools import partial
 from multiprocessing import Pool
@@ -22,12 +23,21 @@ class NuScenesLoader:
         sd_record = self.nusc.get('sample_data', sample_data_token)
         pose_record = self.nusc.get('ego_pose', sd_record['ego_pose_token'])
         cs_record = self.nusc.get('calibrated_sensor', sd_record['calibrated_sensor_token'])
+#         return dict({
+#             'sensor_R_quaternion': np.asarray(cs_record['rotation']),
+#             'sensor_R': np.asarray(quaternion_transformer.from_quat(cs_record['rotation']).as_matrix()),
+#             'sensor_t': np.asarray(cs_record['translation']),
+#             'ego_R_quaternion': np.asarray(pose_record['rotation']),
+#             'ego_R': np.asarray(quaternion_transformer.from_quat(pose_record['rotation']).as_matrix()),
+#             'ego_t': np.asarray(pose_record['translation']),
+#             'camera_intrinsic': np.asarray(cs_record['camera_intrinsic'])
+#         })
         return dict({
-            'sensor_R_quaternion': np.asarray(cs_record['rotation']),
-            'sensor_R': np.asarray(quaternion_transformer.from_quat(cs_record['rotation']).as_matrix()),
+            'sensor_R_quaternion': Quaternion(cs_record['rotation']).elements,
+            'sensor_R': Quaternion(cs_record['rotation']).rotation_matrix,
             'sensor_t': np.asarray(cs_record['translation']),
-            'ego_R_quaternion': np.asarray(pose_record['rotation']),
-            'ego_R': np.asarray(quaternion_transformer.from_quat(pose_record['rotation']).as_matrix()),
+            'ego_R_quaternion': Quaternion(pose_record['rotation']).elements,
+            'ego_R': Quaternion(pose_record['rotation']).rotation_matrix,
             'ego_t': np.asarray(pose_record['translation']),
             'camera_intrinsic': np.asarray(cs_record['camera_intrinsic'])
         })

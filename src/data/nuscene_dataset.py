@@ -46,6 +46,15 @@ class NusceneDataset(Dataset):
         dir_cls = np.zeros(2)
         dir_cls[bin] = 1
         return rad, dir_cls
+    
+    def rotation_angle_to_sin_pi_and_bin(self, rotation_angle):
+        rad = np.sin(rotation_angle)
+        dir_cls = np.zeros(2)
+        if np.abs(rotation_angle)>np.pi/2:
+            dir_cls[0] = 1
+        else:
+            dir_cls[1] = 1
+        return rad, dir_cls
 
     def rotation_angle_to_pi_and_minus_pi(self, rotation_angle):
         return rotation_angle/2.0/np.pi
@@ -110,7 +119,8 @@ class NusceneDataset(Dataset):
                     boxes.sort(key=lambda item: distance_to_center([x*stride, y*stride], item['box_2d']))
                     box = boxes[0]
                     box_2d = np.asarray(box['box_2d'], dtype=object)//stride
-                    rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['rotation_angle_rad'])
+#                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['rotation_angle_rad'])
+                    rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(box['rotation_angle_rad'])
 
                     category_onehot = self.gen_category_onehot(box['category'])
                     if category_onehot is None:

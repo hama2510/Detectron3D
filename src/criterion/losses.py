@@ -10,75 +10,92 @@ class Criterion(nn.Module):
         self.device = device
         self.alpha = alpha
         self.gamma = gamma
+        self.esp = 1e-8
         
-    def focal_loss(self, pred, target, esp=1e-8):
-        pred, target = self.flattern(pred, target)
-        # pred = torch.clamp(torch.nn.functional.softmax(pred,dim=2), min=1e-4, max=1-1e-4)
-        # pred = torch.clamp(pred, min=1e-4, max=1-1e-4)
-        pos_inds = target.eq(1)
-        neg_inds = target.lt(1)
-
-        # neg_weights = torch.pow(1 - target[neg_inds], 4)
-
-        loss = 0
-        pos_pred = pred[pos_inds]
-        neg_pred = pred[neg_inds]
-
-        pos_loss = torch.log(pos_pred) * torch.pow(1 - pos_pred, self.gamma)
-        # neg_loss = torch.log(1 - neg_pred) * torch.pow(neg_pred, self.gamma) * neg_weights
-        neg_loss = torch.log(1 - neg_pred) * torch.pow(neg_pred, self.gamma)
-
-        num_pos  = pos_inds.float().sum()
-        pos_loss = pos_loss.sum()
-        neg_loss = neg_loss.sum()
-
-        if pos_pred.nelement() == 0:
-            loss = loss - neg_loss
-        else:
-            loss = loss - (pos_loss + neg_loss) / num_pos
-        return loss
-
     def to_device(self, item):
         for key in item.keys():
             item[key] = item[key].to(self.device)
         return item
 
     def flattern(self, pred, target):
-        shape = pred.shape
-        pred = torch.reshape(pred.view(shape[0], shape[2], shape[3], shape[1]), (shape[0]*shape[1]*shape[2], shape[3]))
-        shape = target.shape
-        target = torch.reshape(target, (shape[0]*shape[1]*shape[2], shape[3]))
+        pred = pred.view(pred.shape[0], pred.shape[1], pred.shape[2]*pred.shape[3])
+        target = torch.moveaxis(target, -1, 1)
+        target = target.view(target.shape[0], target.shape[1], target.shape[2]*target.shape[3])
         return pred, target
-
-    def smooth_l1_loss(self, pred, target):
+    
+    def gen_mask(self, target):
+        target = torch.moveaxis(target, -1, 1)
+        target = target.view(target.shape[0], target.shape[1], target.shape[2]*target.shape[3])
+        masked = target.sum(axis=1)
+        return masked.view(masked.shape[0], 1, masked.shape[1])
+        
+    def focal_loss(self, pred, target):
         pred, target = self.flattern(pred, target)
-        return nn.SmoothL1Loss()(pred, target)
+        pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
 
-    def bce_loss(self, pred, target):
-        pred, target = self.flattern(pred, target)
-        loss = nn.BCELoss()(pred, target)
-        # pos_inds = target.eq(1)
-        # loss = nn.BCELoss(reduction='none')(pred, target)*pos_index.float().sum(axis=1)
-        # loss = loss.sum()/pos_inds.float().sum()
+        pos_inds = target.eq(1)
+        neg_inds = target.lt(1)
+        
+        pos_pred = pred[pos_inds]
+        neg_pred = pred[neg_inds]
+
+        pos_loss = self.alpha * torch.log(pos_pred) * torch.pow(1 - pos_pred, self.gamma)
+        neg_loss = self.alpha * torch.log(1 - neg_pred) * torch.pow(neg_pred, self.gamma)
+        # neg_weights = torch.pow(1 - target[neg_inds], 4)
+        # neg_loss = torch.log(1 - neg_pred) * torch.pow(neg_pred, self.gamma) * neg_weights
+
+        num_pos  = pos_inds.float().sum()
+        pos_loss = pos_loss.sum()
+        neg_loss = neg_loss.sum()
+
+        if pos_pred.nelement() == 0:
+            loss = 0 - neg_loss
+        else:
+            loss = 0 - (pos_loss + neg_loss) / num_pos
         return loss
 
-    def kl_loss(self, pred, target):
+    def smooth_l1_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
-        pred = torch.clamp(pred, min=1e-4, max=1-1e-4)
-        kl_loss = target*torch.log(target/pred)
-        # pos_inds = target.eq(1)
-        # loss = nn.BCELoss(reduction='none')(pred, target).mean(axis=1)*pos_index.float().sum(axis=1)
-        # loss = loss.sum()/pos_inds.float().sum()
-        return loss
+        if masked is None:
+            return nn.SmoothL1Loss()(pred, target)
+        else:
+            num_pos = masked.sum()
+            if num_pos==0:
+                return torch.tensor(0)
+            else:
+                return (nn.SmoothL1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
 
-    def cross_entropy_loss(self, pred, target):
+    def bce_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
-        loss = nn.CrossEntropyLoss()(pred, target)
-        # pred = torch.clamp(torch.nn.functional.softmax(pred,dim=2), min=1e-4, max=1-1e-4)
-        # pos_inds = target.eq(1)
-        # loss = nn.CrossEntropyLoss(reduction='none')(pred, target).mean(axis=1)*pos_inds.float().sum(axis=1)
-        # loss = loss.sum()/.float().sum()
-        return loss
+        if masked is None:
+            return nn.BCELoss()(pred, target)
+        else:
+            num_pos = masked.sum()
+            if num_pos==0:
+                return torch.tensor(0)
+            else:
+                return (nn.BCELoss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
+
+#     def kl_loss(self, pred, target):
+#         pred, target = self.flattern(pred, target)
+#         pred = torch.clamp(pred, min=1e-4, max=1-1e-4)
+#         kl_loss = target*torch.log(target/pred)
+#         # pos_inds = target.eq(1)
+#         # loss = nn.BCELoss(reduction='none')(pred, target).mean(axis=1)*pos_index.float().sum(axis=1)
+#         # loss = loss.sum()/pos_inds.float().sum()
+#         return loss
+
+    def cross_entropy_loss(self, pred, target, masked):
+        pred, target = self.flattern(pred, target)
+        pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
+        if masked is None:
+            return nn.CrossEntropyLoss()(pred, target)
+        else:
+            num_pos = masked.sum()
+            if num_pos==0:
+                return torch.tensor(0)
+            else:
+                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum()/num_pos
 
     def stride_to_feat_level(self, stride):
         return int(np.log2(stride))
@@ -87,18 +104,18 @@ class Criterion(nn.Module):
         pred = pred['p{}'.format(self.stride_to_feat_level(stride))]
         target = target['{}'.format(stride)]
         target = self.to_device(target)
+        
+        masked = self.gen_mask(target['category'])
 
         category_loss = self.focal_loss(pred['category'], target['category'])
-        attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'])
-        centerness_loss = self.bce_loss(pred['centerness'], target['centerness'])
-        # centerness_loss = self.kl_loss(pred['centerness'], target['centerness'])
-        offset_loss = self.smooth_l1_loss(pred['offset'], target['offset'])
-        depth_loss = self.smooth_l1_loss(torch.exp(pred['depth']), target['depth'])
-        size_loss = self.smooth_l1_loss(pred['size'], target['size'])
-        rotation_loss = self.smooth_l1_loss(pred['rotation'], target['rotation'])
-        dir_loss = self.cross_entropy_loss(pred['dir'], target['dir'])
-        velocity_loss = self.smooth_l1_loss(pred['velocity'], target['velocity'])
-#         return category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
+        attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)
+        centerness_loss = self.bce_loss(pred['centerness'], target['centerness'], masked)
+        offset_loss = self.smooth_l1_loss(pred['offset'], target['offset'], masked)
+        depth_loss = self.smooth_l1_loss(torch.exp(pred['depth']), target['depth'], masked)
+        size_loss = self.smooth_l1_loss(pred['size'], target['size'], masked)
+        rotation_loss = self.smooth_l1_loss(pred['rotation'], target['rotation'], masked)
+        dir_loss = self.cross_entropy_loss(pred['dir'], target['dir'], masked)
+        velocity_loss = self.smooth_l1_loss(pred['velocity'], target['velocity'], masked)
         return category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss
     
     def forward(self, target, pred):
@@ -106,6 +123,7 @@ class Criterion(nn.Module):
         loss_log = {}
         for stride in target.keys():
             category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss = self.loss(pred, target, int(stride))
+#             print(category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss)
             loss = category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
             total_loss+=loss
             loss_log[stride] = {

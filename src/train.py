@@ -16,6 +16,8 @@ import sys, os
 from valid import Evaluation
 # from copy import deepcopy
 import pickle
+from utils.logger import Logger
+from time import sleep
 
 torch.manual_seed(42)
 # torch.multiprocessing.set_sharing_strategy('file_system')
@@ -48,6 +50,7 @@ if __name__ == '__main__':
     dataloader_val = DataLoader(dataset_val, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     criterion = Criterion(device=config.device)
     evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
+    logger = Logger()
 
     models = []
     for model_id, item in enumerate(config.models):
@@ -57,33 +60,38 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=config.lr)
         models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss':init_loss_log()})
     
-        if not os.path.exists(model_config.model.save_dir):
-            os.makedirs(model_config.model.save_dir)
-        pickle.dump([], open(os.path.join(model_config.model.save_dir, 'log.csv'), 'wb'))
+        logger.init(model_config.model.save_dir)
 
     for epoch in range(1, config.epochs+1):
         # train
         for model_id in range(0, len(models)):
             models[model_id]['loss'] = init_loss_log()
-        for step, samples in enumerate(tqdm(dataloader_train, desc="Train", leave=False)):
-            for model_id in range(0, len(models)):
-                model = models[model_id]['model']
-                optimizer = models[model_id]['optimizer']
+        with tqdm(dataloader_train, desc="Train") as tepoch:
+            for step, samples in enumerate(tepoch):
+                loss_str = ''
+                for model_id in range(0, len(models)):
+                    model = models[model_id]['model']
+                    optimizer = models[model_id]['optimizer']
 
-                imgs = samples['img']
-                targets = samples['target']
+                    imgs = samples['img']
+                    targets = samples['target']
 
-                imgs = imgs.to(config.device)
-                pred = model(imgs)
-                optimizer.zero_grad()
-                loss, loss_log = criterion(targets, pred)
-                loss.backward()
-                optimizer.step()
+                    imgs = imgs.to(config.device)
+                    pred = model(imgs)
+                    optimizer.zero_grad()
+                    loss, loss_log = criterion(targets, pred)
+                    loss.backward()
+                    optimizer.step()
 
-                models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
-                for stride in loss_log.keys():
-                    for key in loss_log[stride].keys():
-                        models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
+                    models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
+                    for stride in loss_log.keys():
+                        for key in loss_log[stride].keys():
+                            models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
+                
+                    loss_str+='{},'.format(np.round(np.mean(models[model_id]['loss']['total']), decimals=4))
+                loss_str = loss_str[:-1]
+                tepoch.set_postfix(loss=loss_str)
+                sleep(0.1)
 #             break
 
 #         # valid
@@ -104,13 +112,17 @@ if __name__ == '__main__':
                     for key in pred.keys():
                         item['pred'][key]={}
                         for sub_key in pred[key].keys():
-                            item['pred'][key][sub_key] = pred[key][sub_key][i].detach().cpu().numpy()
+                            item['pred'][key][sub_key] = pred[key][sub_key][i]
                     models[model_id]['pred'].append(item)
 
         for model_id in range(0, len(models)):
             preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
-            metrics_summary = evaluation.evaluate(preds, eval_set='mini_val')
-            nds = metrics_summary['nd_score']
+            if len(preds)>0:
+                metrics_summary = evaluation.evaluate(preds, eval_set='mini_val')
+                nds = metrics_summary['nd_score']
+            else:
+                metrics_summary = {}
+                nds = 0
             if config.save_best:
                 if nds>=models[model_id]['best_score']:
                     torch.save(model.state_dict(), os.path.join(models[model_id]['config'].model.save_dir, 'best_model.pth'))
@@ -118,10 +130,8 @@ if __name__ == '__main__':
                 torch.save(model.state_dict(), os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
-                
-            log = pickle.load(open(os.path.join(models[model_id]['config'].model.save_dir, 'log.csv'), 'rb'))
-            log.append(metrics_summary)
-            pickle.dump(log, open(os.path.join(models[model_id]['config'].model.save_dir, 'log.csv'), 'wb'))
+
+                logger.log({'loss': models[model_id]['loss']['total'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
             print('epoch={},model={},loss={},nds={}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), np.round(nds, decimals=2)))
 
             models[model_id]['pred'] = []

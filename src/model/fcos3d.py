@@ -42,6 +42,8 @@ class PredictionHead(nn.Module):
 class ClassificationHead(nn.Module):
     def __init__(self, in_channel, num_cate, num_attr, kernel_size, padding, num_conv):
         super().__init__()
+#         self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
         self.convs = PredictionHead(in_channel, kernel_size, padding, num_conv)
         self.conv_cate = nn.Conv2d(in_channel, num_cate, kernel_size, padding=padding)
         self.conv_attr = nn.Conv2d(in_channel, num_attr, kernel_size, padding=padding)
@@ -49,7 +51,7 @@ class ClassificationHead(nn.Module):
     def forward(self, x):
         x = self.convs(x)
         outs = OrderedDict()
-        outs['category'] = self.conv_cate(x)
+        outs['category'] = self.sigmoid(self.conv_cate(x))
         outs['attribute'] = self.conv_attr(x)
         return outs
 
@@ -59,6 +61,7 @@ class RegressionHead(nn.Module):
         self.convs = PredictionHead(in_channel, kernel_size, padding, num_conv)
         self.sigmoid = nn.Sigmoid()
         self.relu = nn.ReLU()
+        self.tanh = torch.nn.Tanh()
         self.conv_centerness = nn.Conv2d(in_channel, 1, kernel_size, padding=padding)
         self.conv_offset = nn.Conv2d(in_channel, 2, kernel_size, padding=padding)
         self.conv_depth = nn.Conv2d(in_channel, 1, kernel_size, padding=padding)
@@ -74,7 +77,7 @@ class RegressionHead(nn.Module):
         outs['offset'] = self.conv_offset(x)
         outs['depth'] = self.relu(self.conv_depth(x))
         outs['size'] = self.relu(self.conv_size(x))
-        outs['rotation'] = self.sigmoid(self.conv_rotation(x))
+        outs['rotation'] = self.tanh(self.conv_rotation(x))
         outs['dir'] = self.conv_dir(x)
         outs['velocity'] = self.conv_velo(x)
         return outs

@@ -52,7 +52,7 @@ class FCOSDetector(nn.Module):
         if self.config.model['eval']:
             self.model.eval()
 
-    def transform_predict(self, pred, thres=0.05):
+    def transform_predict(self, pred, thres=0.0):
         boxes = []
         sample_token = pred['sample_token']
         calib_matrix = pred['calibration_matrix']
@@ -60,15 +60,15 @@ class FCOSDetector(nn.Module):
 #             stride = int(key)
             stride = 2**int(key[1:])
             
-            category_map = pred['pred'][key]['category']
-            attribute_map = pred['pred'][key]['attribute']
-            centerness_map = pred['pred'][key]['centerness']
-            offset_map = pred['pred'][key]['offset']
-            depth_map = pred['pred'][key]['depth']
-            size_map = pred['pred'][key]['size']
-            rotation_map = pred['pred'][key]['rotation']
-            dir_map = pred['pred'][key]['dir']
-            velocity_map = pred['pred'][key]['velocity']
+            category_map = pred['pred'][key]['category'].detach().cpu().numpy()
+            attribute_map = nn.functional.softmax(pred['pred'][key]['attribute'], axis=1).detach().cpu().numpy()
+            centerness_map = pred['pred'][key]['centerness'].detach().cpu().numpy()
+            offset_map = pred['pred'][key]['offset'].detach().cpu().numpy()
+            depth_map = pred['pred'][key]['depth'].detach().cpu().numpy()
+            size_map = pred['pred'][key]['size'].detach().cpu().numpy()
+            rotation_map = pred['pred'][key]['rotation'].detach().cpu().numpy()
+            dir_map = nn.functional.softmax(pred['pred'][key]['dir'], axis=1).detach().cpu().numpy()
+            velocity_map = pred['pred'][key]['velocity'].detach().cpu().numpy()
             
             category_map = np.moveaxis(category_map, 0, -1)
             attribute_map = np.moveaxis(attribute_map, 0, -1)
@@ -91,10 +91,19 @@ class FCOSDetector(nn.Module):
 #                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)
                 size = size_map[idx[0],idx[1],:]
-                rotation = rotation_map[idx[0],idx[1],0]*np.pi
+#                 rotation = rotation_map[idx[0],idx[1],0]*np.pi
+                rotation = np.arcsin(rotation_map[idx[0],idx[1],0])
                 dir = np.argmax(dir_map[idx[0],idx[1],:])
                 if dir==0:
-                    rotation = -rotation
+                    if rotation<0:
+                        rotation-=np,pi/2
+                    else:
+                        rotation+=np.pi/2
+                else:
+                    if rotation<0:
+                        rotation+=np.pi/2
+                    else:
+                        rotation-=np.pi/2
                 rotation_q = Quaternion(axis=[0, 0, 1], angle=rotation)
                 velocity = velocity_map[idx[0],idx[1],:]
                 category = self.meta_data['categories'][np.argmax(category_map[idx[0],idx[1],:])]

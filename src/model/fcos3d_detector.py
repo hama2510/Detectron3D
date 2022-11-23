@@ -61,13 +61,13 @@ class FCOSDetector(nn.Module):
             stride = 2**int(key[1:])
             
             category_map = pred['pred'][key]['category'].detach().cpu().numpy()
-            attribute_map = nn.functional.softmax(pred['pred'][key]['attribute'], axis=1).detach().cpu().numpy()
+            attribute_map = nn.functional.softmax(pred['pred'][key]['attribute'], dim=1).detach().cpu().numpy()
             centerness_map = pred['pred'][key]['centerness'].detach().cpu().numpy()
             offset_map = pred['pred'][key]['offset'].detach().cpu().numpy()
             depth_map = pred['pred'][key]['depth'].detach().cpu().numpy()
             size_map = pred['pred'][key]['size'].detach().cpu().numpy()
             rotation_map = pred['pred'][key]['rotation'].detach().cpu().numpy()
-            dir_map = nn.functional.softmax(pred['pred'][key]['dir'], axis=1).detach().cpu().numpy()
+            dir_map = nn.functional.softmax(pred['pred'][key]['dir'], dim=1).detach().cpu().numpy()
             velocity_map = pred['pred'][key]['velocity'].detach().cpu().numpy()
             
             category_map = np.moveaxis(category_map, 0, -1)
@@ -96,7 +96,7 @@ class FCOSDetector(nn.Module):
                 dir = np.argmax(dir_map[idx[0],idx[1],:])
                 if dir==0:
                     if rotation<0:
-                        rotation-=np,pi/2
+                        rotation-=np.pi/2
                     else:
                         rotation+=np.pi/2
                 else:

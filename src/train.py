@@ -88,7 +88,7 @@ if __name__ == '__main__':
                         for key in loss_log[stride].keys():
                             models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
                 
-                    loss_str+='{},'.format(np.round(np.mean(models[model_id]['loss']['total']), decimals=4))
+                    loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
                 loss_str = loss_str[:-1]
                 tepoch.set_postfix(loss=loss_str)
                 sleep(0.1)
@@ -113,12 +113,12 @@ if __name__ == '__main__':
                         item['pred'][key]={}
                         for sub_key in pred[key].keys():
                             item['pred'][key][sub_key] = pred[key][sub_key][i]
-                    models[model_id]['pred'].append(item)
+                    models[model_id]['pred'].append(models[model_id]['model'].transform_predict(item))
 
         for model_id in range(0, len(models)):
-            preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
+#             preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
             if len(preds)>0:
-                metrics_summary = evaluation.evaluate(preds, eval_set='mini_val')
+                metrics_summary = evaluation.evaluate(models[model_id]['pred'], eval_set='mini_val')
                 nds = metrics_summary['nd_score']
             else:
                 metrics_summary = {}

@@ -12,7 +12,7 @@ from utils.camera import *
 
 class NusceneDataset(Dataset):
     
-    def __init__(self, data_file, config):
+    def __init__(self, data_file, config, to_tensor=True):
         self.image_root = config.data.image_root
         if not self.image_root.endswith('/'):
             self.image_root+='/'
@@ -21,6 +21,8 @@ class NusceneDataset(Dataset):
         self.visibility_thres = config.visibility_thres
         self.stride_list = [8, 16, 32, 64, 128]
         self.m_list = [0, 64, 128, 256, 512, np.inf]
+        self.radius = 1.5
+        self.to_tensor = to_tensor
         
     def __len__(self):
         return len(self.data)
@@ -35,10 +37,11 @@ class NusceneDataset(Dataset):
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         shape = [img.shape[0], img.shape[1]]
 
-        img = transforms.Compose([transforms.ToTensor()])(img.copy())
-        sample = {'sample_token':item['sample_token'], 'calibration_matrix':item['calibration_matrix'], 'img':img, 'target':{}}
+        if self.to_tensor:
+            img = transforms.Compose([transforms.ToTensor()])(img.copy())
+        sample = {'sample_token':item['sample_token'], 'calibration_matrix':item['calibration_matrix'], 'img_path':item['image'], 'img':img, 'target':{}}
         for stride in self.stride_list:
-            sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride)
+            sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride, item['calibration_matrix'])
         return sample
 
     def rotation_angle_to_pi_and_bin(self, rotation_angle):
@@ -80,6 +83,7 @@ class NusceneDataset(Dataset):
         return [velocity[0], velocity[1]]
 
     def check_box_and_feature_map_level(self, point, box, stride):
+        point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
         (x1, y1), (x2, y2) = xywh_to_xyxy(box)
         l = point[0]-x1
         t = point[1]-y1
@@ -94,10 +98,28 @@ class NusceneDataset(Dataset):
     def centerness(self, point, box, alpha=2.5):
         return np.exp(-alpha*((point[0]-box[0][0])**2+(point[1]-box[0][1])**2))
 
-    def offset(self, point, box, stride):
-        return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
+    def offset(self, point, box):
+        return [box[0][0]-point[0], box[0][1]-point[1]]
+#         return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
 
-    def gen_target(self, anns, shape, stride):
+#     def is_positive_location_3d(self, point, box_center_3d, stride, calib_matrix):
+#         point_3d = coord_2d_to_3d(point, box_center_3d[2], calib_matrix)
+#         d = (box_center_3d[0] - point_3d[0])**2 + (box_center_3d[1] - point_3d[1])**2 + (box_center_3d[2] - point_3d[2])**2
+#         if d<self.radius*stride:
+#             return True
+#         else:
+#             return False
+        
+    def is_positive_location(self, point, box, stride):
+        point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
+        box_center = box[0]
+        d = np.sqrt((box_center[0] - point[0])**2 + (box_center[1] - point[1])**2)
+        if d<self.radius*stride:
+            return True
+        else:
+            return False
+        
+    def gen_target(self, anns, shape, stride, calib_matrix):
         shape =  [int(np.ceil(shape[0]/stride)), int(np.ceil(shape[1]/stride))]
         category_target = np.zeros((shape[0], shape[1], len(self.meta_data['categories'])))
         attribute_target = np.zeros((shape[0], shape[1], len(self.meta_data['attributes'])))
@@ -112,7 +134,7 @@ class NusceneDataset(Dataset):
             for y in range(shape[1]):
                 boxes = []
                 for ann in anns:
-                    if is_inside([x*stride, y*stride], ann['box_2d']) and ann['visibility']>self.visibility_thres and self.check_box_and_feature_map_level([x*stride, y*stride], ann['box_2d'], stride):
+                    if self.is_positive_location([x, y], ann['box_2d'], stride) and ann['visibility']>self.visibility_thres and self.check_box_and_feature_map_level([x, y], ann['box_2d'], stride):
                         boxes.append(ann)
                 if len(boxes)>0:
                     # foreground location
@@ -129,15 +151,22 @@ class NusceneDataset(Dataset):
                     category_target[x,y,:] = category_onehot
                     attribute_target[x,y,:] = self.gen_attribute_onehot(box['attribute'])
                     centerness_target[x,y,:] = self.centerness([x,y], box_2d)
-                    offset_target[x,y,:] = self.offset([x,y], box['box_2d'], stride)
+                    offset_target[x,y,:] = self.offset([x,y], box_2d)
                     depth_target[x,y,:] = box['xyz_in_sensor_coor'][2]
                     size_target[x,y,:] = box['box_size']
                     rotation_target[x,y,:] = rad
                     dir_target[x,y,:] = dir_cls
                     velocity_target[x,y,:] = self.gen_velocity(box['velocity'])
 
-        return {'category': torch.FloatTensor(category_target), 'attribute': torch.FloatTensor(attribute_target), 
-                'centerness':torch.FloatTensor(centerness_target),  'offset': torch.FloatTensor(offset_target), 
-                'depth': torch.FloatTensor(depth_target),  'size': torch.FloatTensor(size_target), 
-                'rotation': torch.FloatTensor(rotation_target), 'dir': torch.FloatTensor(dir_target), 'velocity': torch.FloatTensor(velocity_target)
+        if self.to_tensor:
+            return {'category': torch.FloatTensor(category_target), 'attribute': torch.FloatTensor(attribute_target), 
+                    'centerness':torch.FloatTensor(centerness_target),  'offset': torch.FloatTensor(offset_target), 
+                    'depth': torch.FloatTensor(depth_target),  'size': torch.FloatTensor(size_target), 
+                    'rotation': torch.FloatTensor(rotation_target), 'dir': torch.FloatTensor(dir_target), 'velocity': torch.FloatTensor(velocity_target)
+                   }
+        else:
+            return {'category': category_target, 'attribute': attribute_target, 
+                'centerness': centerness_target,  'offset': offset_target, 
+                'depth': depth_target,  'size': size_target, 
+                'rotation': rotation_target, 'dir': dir_target, 'velocity': velocity_target
                }

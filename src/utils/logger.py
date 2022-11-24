@@ -5,7 +5,7 @@ import os, sys
 class Logger:
     
     def __init__(self):
-        self.log_file = 'log_{}.pkl'.format(datetime.now().strftime("%m_%d_%Y_%H_%M"))
+        self.log_file = 'log_{}.pkl'.format(datetime.now().strftime("%Y%m%d_%H%M"))
 
     def init(self, save_dir):
         if not os.path.exists(save_dir):

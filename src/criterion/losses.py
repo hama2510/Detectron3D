@@ -31,7 +31,9 @@ class Criterion(nn.Module):
         
     def focal_loss(self, pred, target):
         pred, target = self.flattern(pred, target)
-        pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
+#         pred = torch.clamp(pred, min=self.esp)
+        pred[pred==1] = 1-self.esp
+        pred[pred==0] = self.esp
 
         pos_inds = target.eq(1)
         neg_inds = target.lt(1)
@@ -64,6 +66,17 @@ class Criterion(nn.Module):
                 return torch.tensor(0)
             else:
                 return (nn.SmoothL1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
+            
+    def l1_loss(self, pred, target, masked):
+        pred, target = self.flattern(pred, target)
+        if masked is None:
+            return nn.L1Loss()(pred, target)
+        else:
+            num_pos = masked.sum()
+            if num_pos==0:
+                return torch.tensor(0)
+            else:
+                return (nn.L1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
 
     def bce_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
@@ -111,6 +124,7 @@ class Criterion(nn.Module):
         attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)
         centerness_loss = self.bce_loss(pred['centerness'], target['centerness'], masked)
         offset_loss = self.smooth_l1_loss(pred['offset'], target['offset'], masked)
+#         offset_loss = self.l1_loss(pred['offset'], target['offset'], masked)
         depth_loss = self.smooth_l1_loss(torch.exp(pred['depth']), target['depth'], masked)
         size_loss = self.smooth_l1_loss(pred['size'], target['size'], masked)
         rotation_loss = self.smooth_l1_loss(pred['rotation'], target['rotation'], masked)

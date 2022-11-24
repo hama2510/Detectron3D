@@ -11,17 +11,26 @@ import sys
 sys.path.append('..')
 from utils.nms import rotated_nms
 from utils.camera import coord_2d_to_3d, sensor_coord_to_real_coord
+from datetime import datetime
+from collections import OrderedDict
 
 class FCOSDetector(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
         self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
-        self.model = self.create_model()
-        self.load_model()
+        self.init()
 
     def forward(self, x):
         return self.model(x)
+    
+    def init(self, ):
+        self.model = self.create_model()
+        if 'load_model' in self.config.model.keys() and self.config.model.load_model:
+            print('Loaded weight from {}'.format(self.config.model.load_model))
+            self.load_model(self.config.model.load_model)
+        if self.config.model['eval']:
+            self.model.eval()
     
     def create_model(self,):
         if self.config.model.model_name=='mobilenet':
@@ -39,27 +48,26 @@ class FCOSDetector(nn.Module):
             model = nn.DataParallel(model)
         model.to(self.config['device'])
         return model
+    
+    def save_model(self, path):
+        new_state_dict = OrderedDict()
+        for k, v in self.model.state_dict().items():
+            new_state_dict[k] = v
+        torch.save(new_state_dict, path)
      
-    def load_model(self, ):
-        if 'load_model' in self.config.model.keys() and self.config.model.load_model:
-            print('Loaded weight from {}'.format(self.config.model.load_model))
-            state_dict = torch.load(self.config.model.load_model)
-            new_state_dict = OrderedDict()
-            for k, v in state_dict.items():
-                name = k[6:] # remove `model.`
-                new_state_dict[name] = v
-            self.model.load_state_dict(new_state_dict)
-        if self.config.model['eval']:
-            self.model.eval()
-
-    def transform_predict(self, pred, thres=0.0):
-        boxes = []
-        sample_token = pred['sample_token']
-        calib_matrix = pred['calibration_matrix']
+    def load_model(self, path):
+        state_dict = torch.load(path)
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+#             print(k)
+#             name = k[6:] # remove `model.`
+            new_state_dict[k] = v
+        self.model.load_state_dict(new_state_dict)
+        
+    def tensor_to_numpy(self, pred):
+        output = {'sample_token':pred['sample_token'], 'calibration_matrix':pred['calibration_matrix'], 'pred':{}}
         for key in pred['pred'].keys():
-#             stride = int(key)
-            stride = 2**int(key[1:])
-            
+            output['pred'][key] = {}
             category_map = pred['pred'][key]['category'].detach().cpu().numpy()
             attribute_map = nn.functional.softmax(pred['pred'][key]['attribute'], dim=1).detach().cpu().numpy()
             centerness_map = pred['pred'][key]['centerness'].detach().cpu().numpy()
@@ -80,13 +88,44 @@ class FCOSDetector(nn.Module):
             dir_map = np.moveaxis(dir_map, 0, -1)
             velocity_map = np.moveaxis(velocity_map, 0, -1)
             
+            output['pred'][key]['category'] = category_map
+            output['pred'][key]['attribute'] = attribute_map
+            output['pred'][key]['centerness'] = centerness_map
+            output['pred'][key]['offset'] = offset_map
+            output['pred'][key]['depth'] = depth_map
+            output['pred'][key]['size'] = size_map
+            output['pred'][key]['rotation'] = rotation_map
+            output['pred'][key]['dir'] = dir_map
+            output['pred'][key]['velocity'] = velocity_map
+        return output
+
+    def transform_predict(self, pred, thres=0.05):
+        boxes = []
+        sample_token = pred['sample_token']
+        calib_matrix = pred['calibration_matrix']
+        for key in pred['pred'].keys():
+#             stride = int(key)
+            stride = 2**int(key[1:])
+            
+            category_map = pred['pred'][key]['category']
+            attribute_map = pred['pred'][key]['attribute']
+            centerness_map = pred['pred'][key]['centerness']
+            offset_map = pred['pred'][key]['offset']
+            depth_map = pred['pred'][key]['depth']
+            size_map = pred['pred'][key]['size']
+            rotation_map = pred['pred'][key]['rotation']
+            dir_map = pred['pred'][key]['dir']
+            velocity_map = pred['pred'][key]['velocity']
+            
             cls_score = np.max(category_map, axis=2)
             pred_score = cls_score*centerness_map[:,:,0]
             indices = np.argwhere(pred_score>thres)
             indices = np.unique(indices, axis=0)
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
-                x, y = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
+#                 x, y = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
+                x = int(idx[0]+offset_map[idx[0], idx[1],0])*stride + np.floor(stride) 
+                y = int(idx[1]+offset_map[idx[0], idx[1],1])*stride + np.floor(stride) 
                 depth = np.exp(depth_map[idx[0]][idx[1],0])
 #                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)

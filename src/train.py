@@ -20,7 +20,7 @@ from utils.logger import Logger
 from time import sleep
 
 torch.manual_seed(42)
-# torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 def init_loss_log():
     loss_log = {'total':[], 'component':{}}
@@ -90,7 +90,7 @@ if __name__ == '__main__':
                 
                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
                 loss_str = loss_str[:-1]
-                tepoch.set_postfix(loss=loss_str)
+                tepoch.set_postfix(epoch=epoch, loss=loss_str)
                 sleep(0.1)
 #             break
 
@@ -113,26 +113,26 @@ if __name__ == '__main__':
                         item['pred'][key]={}
                         for sub_key in pred[key].keys():
                             item['pred'][key][sub_key] = pred[key][sub_key][i]
-                    models[model_id]['pred'].append(models[model_id]['model'].transform_predict(item))
+                    models[model_id]['pred'].append(models[model_id]['model'].tensor_to_numpy(item))
 
         for model_id in range(0, len(models)):
-#             preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
+            preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
             if len(preds)>0:
-                metrics_summary = evaluation.evaluate(models[model_id]['pred'], eval_set='mini_val')
+                metrics_summary = evaluation.evaluate(models[model_id]['pred'], eval_set='mini_val', verbose=True)
                 nds = metrics_summary['nd_score']
             else:
                 metrics_summary = {}
                 nds = 0
             if config.save_best:
                 if nds>=models[model_id]['best_score']:
-                    torch.save(model.state_dict(), os.path.join(models[model_id]['config'].model.save_dir, 'best_model.pth'))
+                    model.save(os.path.join(models[model_id]['config'].model.save_dir, 'best_model.pth'))
             else:
-                torch.save(model.state_dict(), os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
+                model.save(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
 
-                logger.log({'loss': models[model_id]['loss']['total'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
-            print('epoch={},model={},loss={},nds={}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), np.round(nds, decimals=2)))
+            logger.log({'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
+#             print('epoch={},model={},loss={},nds={}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), np.round(nds, decimals=2)))
 
             models[model_id]['pred'] = []
         

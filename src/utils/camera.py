@@ -6,31 +6,38 @@ import numpy as np
 from nuscenes.utils.geometry_utils import view_points
 from nuscenes.utils.data_classes import Box
 
-def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t):
-    sensor_extrinsic = np.concatenate([
-            np.float32(sensor_R),
-            np.float32(sensor_t)[:, None],
-        ], axis=-1)
-    sensor_extrinsic = np.vstack([sensor_extrinsic, np.array([0, 0, 0, 1])])
-    ego_extrinsic = np.concatenate([
-        np.float32(ego_R),
-        np.float32(ego_t)[:, None],
-    ], axis=-1)
-    ego_extrinsic = np.vstack([ego_extrinsic, np.array([0, 0, 0, 1])])
+def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=True):
+    intrinsic, sensor_R, sensor_t, ego_R, ego_t = np.array(intrinsic), np.array(sensor_R), np.array(sensor_t), np.array(ego_R), np.array(ego_t)
+    
     intrinsic = np.vstack([intrinsic, [0,0,0]])
     intrinsic = np.hstack([intrinsic, [[0],[0],[0],[1]]])
-    return intrinsic, sensor_extrinsic, ego_extrinsic
+    
+    if not calibrated:
+        sensor_extrinsic = np.concatenate([
+                np.float32(sensor_R),
+                np.float32(sensor_t)[:, None],
+            ], axis=-1)
+        sensor_extrinsic = np.vstack([sensor_extrinsic, np.array([0, 0, 0, 1])])
+        ego_extrinsic = np.concatenate([
+            np.float32(ego_R),
+            np.float32(ego_t)[:, None],
+        ], axis=-1)
+        ego_extrinsic = np.vstack([ego_extrinsic, np.array([0, 0, 0, 1])])
+        return intrinsic, sensor_extrinsic, ego_extrinsic
+    else:
+        return intrinsic
 
 def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
-    coord_3d, intrinsic, sensor_R, sensor_t, ego_R, ego_t = np.array(coord_3d), np.array(intrinsic), np.array(sensor_R), np.array(sensor_t), np.array(ego_R), np.array(ego_t)
-    # change to homogeneous coordinate
+    coord_3d = np.array(coord_3d)
     coord_3d = np.append(coord_3d, 1)
-    intrinsic, sensor_extrinsic, ego_extrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t)
+    
     # no need extrinsic matrix because the coordinate has been rotated and translated
     if calibrated:
+        intrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
         coord_2d = intrinsic @ coord_3d
     else:
+        intrinsic, sensor_extrinsic, ego_extrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
         coord_2d = intrinsic @ sensor_extrinsic @ ego_extrinsic @ coord_3d
     coord_2d = (coord_2d / coord_2d[[-2]])[:2].T.astype(int)
     return coord_2d
@@ -63,7 +70,7 @@ def cal_area(box):
 
 def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
-    intrinsic, _, _ = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t)
+    intrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
     coord_2d = np.asarray(coord_2d)
     coord_2d = np.append(coord_2d, [1, 1/depth])
     intrinsic_inverse = np.linalg.inv(intrinsic)

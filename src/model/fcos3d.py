@@ -42,7 +42,7 @@ class PredictionHead(nn.Module):
 class ClassificationHead(nn.Module):
     def __init__(self, in_channel, num_cate, num_attr, kernel_size, padding, num_conv):
         super().__init__()
-#         self.relu = nn.ReLU()
+        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.convs = PredictionHead(in_channel, kernel_size, padding, num_conv)
         self.conv_cate = nn.Conv2d(in_channel, num_cate, kernel_size, padding=padding)
@@ -51,7 +51,7 @@ class ClassificationHead(nn.Module):
     def forward(self, x):
         x = self.convs(x)
         outs = OrderedDict()
-        outs['category'] = self.sigmoid(self.conv_cate(x))
+        outs['category'] = self.relu(self.conv_cate(x))
         outs['attribute'] = self.conv_attr(x)
         return outs
 

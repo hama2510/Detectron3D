@@ -33,12 +33,11 @@ class Evaluation:
             result['results'][sample_token] = [item for item in preds if item['sample_token']==sample_token]
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-        else:
-            shutil.rmtree(self.output_dir) 
-            os.makedirs(self.output_dir)
+            
         out_file = open(self.result_path, "w")
         json.dump(result, out_file, cls=NpEncoder)
         out_file.close()
+        
         with open(self.cfg_path, 'r') as _f:
             cfg_ = DetectionConfig.deserialize(json.load(_f))
         nusc_eval = DetectionEval(self.nusc, config=cfg_, result_path=self.result_path, eval_set=eval_set, output_dir=self.output_dir, verbose=verbose)
@@ -49,5 +48,5 @@ class Evaluation:
             json.dump(metrics_summary, f, indent=2)
         
         metrics_summary = json.load(open('/home/hotta/kiennt/Detectron3D/tmp/metrics_summary.json', 'r'))
-#         shutil.rmtree(self.output_dir) 
+        shutil.rmtree(self.output_dir) 
         return metrics_summary

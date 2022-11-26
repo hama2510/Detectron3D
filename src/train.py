@@ -22,21 +22,6 @@ from time import sleep
 torch.manual_seed(42)
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-def init_loss_log():
-    loss_log = {'total':[], 'component':{}}
-    for stride in [8, 16, 32, 64, 128]:
-        loss_log['component'][stride] = {
-            'category_loss': [],
-            'attribute_loss': [],
-            'offset_loss': [],
-            'depth_loss': [],
-            'size_loss': [],
-            'rotation_loss': [],
-            'dir_loss': [],
-            'centerness_loss': [],
-        }
-    return loss_log
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--config',type=str, 
@@ -54,18 +39,18 @@ if __name__ == '__main__':
 
     models = []
     for model_id, item in enumerate(config.models):
+        
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
         model = FCOSDetector(model_config)
         optimizer = optim.Adam(model.parameters(), lr=config.lr)
-        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss':init_loss_log()})
+        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
+        logger.create_log_file(model_config.model.save_dir)
     
-        logger.init(model_config.model.save_dir)
-
     for epoch in range(1, config.epochs+1):
         # train
         for model_id in range(0, len(models)):
-            models[model_id]['loss'] = init_loss_log()
+            models[model_id]['loss'] = logger.init_loss_log()
         with tqdm(dataloader_train, desc="Train") as tepoch:
             for step, samples in enumerate(tepoch):
                 loss_str = ''
@@ -90,10 +75,9 @@ if __name__ == '__main__':
                 
                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
                 loss_str = loss_str[:-1]
-                tepoch.set_postfix(epoch=epoch, loss=loss_str)
+                tepoch.set_postfix(ep=epoch, loss=loss_str)
                 sleep(0.1)
-#             break
-
+                
 #         # valid
         for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
             imgs = samples['img']
@@ -116,18 +100,19 @@ if __name__ == '__main__':
                     models[model_id]['pred'].append(models[model_id]['model'].tensor_to_numpy(item))
 
         for model_id in range(0, len(models)):
-            preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'])
+            preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'], det_thres=models[model_id]['config'].det_thres, nms_thres=models[model_id]['config'].nms_thres)
             if len(preds)>0:
-                metrics_summary = evaluation.evaluate(models[model_id]['pred'], eval_set='mini_val', verbose=True)
+#                 metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False)
+                metrics_summary = evaluation.evaluate(preds, verbose=False)
                 nds = metrics_summary['nd_score']
             else:
                 metrics_summary = {}
                 nds = 0
             if config.save_best:
                 if nds>=models[model_id]['best_score']:
-                    model.save(os.path.join(models[model_id]['config'].model.save_dir, 'best_model.pth'))
+                    model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'best_model.pth'))
             else:
-                model.save(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
+                model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
 

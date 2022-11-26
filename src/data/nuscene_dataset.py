@@ -80,7 +80,11 @@ class NusceneDataset(Dataset):
         return onehot
 
     def gen_velocity(self, velocity):
-        return [velocity[0], velocity[1]]
+        if np.isnan(velocity).any():
+#             not a moving object
+            return [0, 0]
+        else:
+            return [velocity[0], velocity[1]]
 
     def check_box_and_feature_map_level(self, point, box, stride):
         point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]

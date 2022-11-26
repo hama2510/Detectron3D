@@ -59,8 +59,6 @@ class FCOSDetector(nn.Module):
         state_dict = torch.load(path)
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
-#             print(k)
-#             name = k[6:] # remove `model.`
             new_state_dict[k] = v
         self.model.load_state_dict(new_state_dict)
         
@@ -68,14 +66,16 @@ class FCOSDetector(nn.Module):
         output = {'sample_token':pred['sample_token'], 'calibration_matrix':pred['calibration_matrix'], 'pred':{}}
         for key in pred['pred'].keys():
             output['pred'][key] = {}
-            category_map = pred['pred'][key]['category'].detach().cpu().numpy()
+            category_map = torch.clamp(pred['pred'][key]['category'], min=1e-4, max=1-1e-4).detach().cpu().numpy()
             attribute_map = nn.functional.softmax(pred['pred'][key]['attribute'], dim=1).detach().cpu().numpy()
+#             attribute_map = pred['pred'][key]['attribute'].detach().cpu().numpy()
             centerness_map = pred['pred'][key]['centerness'].detach().cpu().numpy()
             offset_map = pred['pred'][key]['offset'].detach().cpu().numpy()
             depth_map = pred['pred'][key]['depth'].detach().cpu().numpy()
             size_map = pred['pred'][key]['size'].detach().cpu().numpy()
             rotation_map = pred['pred'][key]['rotation'].detach().cpu().numpy()
             dir_map = nn.functional.softmax(pred['pred'][key]['dir'], dim=1).detach().cpu().numpy()
+#             dir_map = pred['pred'][key]['dir'].detach().cpu().numpy()
             velocity_map = pred['pred'][key]['velocity'].detach().cpu().numpy()
             
             category_map = np.moveaxis(category_map, 0, -1)
@@ -99,7 +99,7 @@ class FCOSDetector(nn.Module):
             output['pred'][key]['velocity'] = velocity_map
         return output
 
-    def transform_predict(self, pred, thres=0.05):
+    def transform_predict(self, pred, det_thres=0.05, nms_thres=0.3):
         boxes = []
         sample_token = pred['sample_token']
         calib_matrix = pred['calibration_matrix']
@@ -119,7 +119,7 @@ class FCOSDetector(nn.Module):
             
             cls_score = np.max(category_map, axis=2)
             pred_score = cls_score*centerness_map[:,:,0]
-            indices = np.argwhere(pred_score>thres)
+            indices = np.argwhere(pred_score>det_thres)
             indices = np.unique(indices, axis=0)
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
@@ -129,7 +129,7 @@ class FCOSDetector(nn.Module):
                 depth = np.exp(depth_map[idx[0]][idx[1],0])
 #                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)
-                size = size_map[idx[0],idx[1],:]
+                size = np.clip(size_map[idx[0],idx[1],:], a_min=1e-4, a_max=None)
 #                 rotation = rotation_map[idx[0],idx[1],0]*np.pi
                 rotation = np.arcsin(rotation_map[idx[0],idx[1],0])
                 dir = np.argmax(dir_map[idx[0],idx[1],:])
@@ -164,13 +164,13 @@ class FCOSDetector(nn.Module):
                     'detection_score': sc,
                     'attribute_name': attribute,
                 })
-        keep_indices = rotated_nms(boxes, calib_matrix)
+        keep_indices = rotated_nms(boxes, calib_matrix, nms_thres=nms_thres)
         boxes = [boxes[i] for i in keep_indices]
         return boxes
     
-    def transform_predicts(self, preds, thres=0.05):
+    def transform_predicts(self, preds, det_thres=0.05, nms_thres=0.3):
         boxes = []
         for pred in preds:
-            boxes.extend(self.transform_predict(pred, thres))
+            boxes.extend(self.transform_predict(pred, det_thres=det_thres, nms_thres=nms_thres))
         return boxes
     

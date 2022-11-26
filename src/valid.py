@@ -25,12 +25,27 @@ class Evaluation:
         self.output_dir = '/home/hotta/kiennt/Detectron3D/tmp/'
         self.result_path = '/home/hotta/kiennt/Detectron3D/tmp/result_tmp.json'
         
+    def dummy_box(self, sample_token):
+        return {
+                    'sample_token': sample_token,
+                    'translation': [0,0,0],
+                    'size': [0,0,0],
+                    'rotation': [0,0,0,0],
+                    'velocity': [0,0],
+                    'detection_name': 'barrier',
+                    'detection_score': 0,
+                    'attribute_name': '',
+                }
+         
     def evaluate(self, preds, eval_set='val', verbose=False):
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
         for sample_token in sample_tokens:
-            result['results'][sample_token] = [item for item in preds if item['sample_token']==sample_token]
+            boxes = [item for item in preds if item['sample_token']==sample_token]
+#             if len(boxes)==0:
+#                 boxes = [self.dummy_box(sample_token)]
+            result['results'][sample_token] = boxes
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
             
@@ -41,7 +56,6 @@ class Evaluation:
         with open(self.cfg_path, 'r') as _f:
             cfg_ = DetectionConfig.deserialize(json.load(_f))
         nusc_eval = DetectionEval(self.nusc, config=cfg_, result_path=self.result_path, eval_set=eval_set, output_dir=self.output_dir, verbose=verbose)
-#         nusc_eval.main(plot_examples=0, render_curves=False)
         metrics, metric_data_list = nusc_eval.evaluate()
         metrics_summary = metrics.serialize()
         with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:

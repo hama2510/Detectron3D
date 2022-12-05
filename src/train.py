@@ -18,7 +18,10 @@ from valid import Evaluation
 import pickle
 from utils.logger import Logger
 from time import sleep
+import random
 
+random.seed(42)
+np.random.seed(42)
 torch.manual_seed(42)
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -39,7 +42,6 @@ if __name__ == '__main__':
 
     models = []
     for model_id, item in enumerate(config.models):
-        
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
         model = FCOSDetector(model_config)
@@ -102,22 +104,23 @@ if __name__ == '__main__':
         for model_id in range(0, len(models)):
             preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'], det_thres=models[model_id]['config'].det_thres, nms_thres=models[model_id]['config'].nms_thres)
             if len(preds)>0:
-#                 metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False)
-                metrics_summary = evaluation.evaluate(preds, verbose=False)
+                if models[model_id]['config'].data.dataset_name == 'v1.0-mini':
+                    metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False)
+                else:
+                    metrics_summary = evaluation.evaluate(preds, verbose=False)
                 nds = metrics_summary['nd_score']
             else:
                 metrics_summary = {}
                 nds = 0
             if config.save_best:
                 if nds>=models[model_id]['best_score']:
-                    model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'best_model.pth'))
+                    model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             else:
                 model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
 
-            logger.log({'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
+            logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
 #             print('epoch={},model={},loss={},nds={}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), np.round(nds, decimals=2)))
-
             models[model_id]['pred'] = []
         

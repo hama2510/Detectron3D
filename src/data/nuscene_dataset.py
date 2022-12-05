@@ -9,20 +9,104 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 sys.path.append('..')
 from utils.camera import *
+from tqdm import tqdm
+import argparse
+import imagesize
+from functools import partial
+from multiprocessing import Pool
 
+STRIDE_LIST = [8, 16, 32, 64, 128]
+M_LIST = [0, 64, 128, 256, 512, np.inf]
+RADIUS = 1.5
+    
+def check_box_and_feature_map_level(point, box, stride, m_list, stride_list):
+        point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
+        (x1, y1), (x2, y2) = xywh_to_xyxy(box)
+        l = point[0]-x1
+        t = point[1]-y1
+        r = x2-point[0]
+        b = y2-point[1]
+        m = np.max([l,t,b,r])
+        if m<m_list[stride_list.index(stride)] or m>m_list[stride_list.index(stride)+1]:
+            return False
+        else:
+            return True
+
+def is_valid_box(box, shape):
+    (x1, y1), (x2, y2) = xywh_to_xyxy(box)
+    if x1<0 or x2<0 or y1<0 or y2<0 or x1>shape[0] or x2>shape[0] or y1>shape[1] or y2>shape[1]:
+        return False
+    else:
+        return True
+
+def is_positive_location(point, box, stride, radius):
+    box_center = [box[0][0]//stride, box[0][1]//stride]
+    d = np.sqrt((box_center[0] - point[0])**2 + (box_center[1] - point[1])**2)
+    point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
+    (x1, y1), (x2, y2) = xywh_to_xyxy(box)
+    if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
+        return True
+    else:
+        return False
+        
+class NusceneDatasetTransform:
+    def __init__(self, num_worker):
+        self.stride_list = STRIDE_LIST
+        self.m_list = M_LIST
+        self.radius = RADIUS
+        self.num_worker = num_worker
+        
+    def update_annotation(self, item):
+        shape = imagesize.get(item['image'])
+        calib_matrix = item['calibration_matrix']
+        anns = item['annotations']
+        for stride in self.stride_list:
+            new_shape =  [int(np.ceil(shape[0]/stride)), int(np.ceil(shape[1]/stride))]
+            for ann in item['annotations']:
+                if not 'targets' in ann.keys():
+                    ann['targets'] = {}
+                ann['targets'][stride] = []
+            for x in range(new_shape[0]):
+                for y in range(new_shape[1]):
+                    boxes = []
+                    for idx, ann in enumerate(anns):
+                        if is_valid_box(ann['box_2d'], shape) and is_positive_location([x, y], ann['box_2d'], stride, self.radius) and check_box_and_feature_map_level([x,y],ann['box_2d'], stride, self.m_list, self.stride_list):
+                            boxes.append([idx, ann])
+                    if len(boxes)>0:
+                        boxes.sort(key=lambda item: distance_to_center([x*stride+np.floor(stride/2), y*stride+np.floor(stride/2)], item[1]['box_2d']))
+                        idx = boxes[0][0]
+                        item['annotations'][idx]['targets'][stride].append([x, y])
+        return item
+            
+    def transform(self, data, out):
+        data = pickle.load(open(data, 'rb'))
+#         data = data[:10]
+        
+        if self.num_worker>0:
+            pool = Pool(self.num_worker)
+            r = list(tqdm(pool.imap(self.update_annotation, data), total=len(data)))
+            pool.close()
+            pool.join()
+        else:
+            for item in tqdm(data):
+                item['annotation'] = self.update_annotation(item)
+            r = data
+        
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        pickle.dump(r, open(out, 'wb'))
+    
 class NusceneDataset(Dataset):
     
-    def __init__(self, data_file, config, to_tensor=True):
+    def __init__(self, data_file, config):
+        self.transformed = config.data.transformed
         self.image_root = config.data.image_root
         if not self.image_root.endswith('/'):
             self.image_root+='/'
         self.data = pickle.load(open(data_file, 'rb'))
         self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
-        self.visibility_thres = config.visibility_thres
-        self.stride_list = [8, 16, 32, 64, 128]
-        self.m_list = [0, 64, 128, 256, 512, np.inf]
-        self.radius = 1.5
-        self.to_tensor = to_tensor
+        self.stride_list = STRIDE_LIST
+        self.m_list = M_LIST
+        self.radius = RADIUS
         
     def __len__(self):
         return len(self.data)
@@ -37,8 +121,7 @@ class NusceneDataset(Dataset):
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         shape = [img.shape[0], img.shape[1]]
 
-        if self.to_tensor:
-            img = transforms.Compose([transforms.ToTensor()])(img.copy())
+        img = transforms.Compose([transforms.ToTensor()])(img.copy())
         sample = {'sample_token':item['sample_token'], 'calibration_matrix':item['calibration_matrix'], 'img_path':item['image'], 'img':img, 'target':{}}
         for stride in self.stride_list:
             sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride, item['calibration_matrix'])
@@ -86,45 +169,15 @@ class NusceneDataset(Dataset):
         else:
             return [velocity[0], velocity[1]]
 
-    def check_box_and_feature_map_level(self, point, box, stride):
-        point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
-        (x1, y1), (x2, y2) = xywh_to_xyxy(box)
-        l = point[0]-x1
-        t = point[1]-y1
-        r = x2-point[0]
-        b = y2-point[1]
-        m = np.max([l,t,b,r])
-        if m<self.m_list[self.stride_list.index(stride)-1] or m>self.m_list[self.stride_list.index(stride)]:
-            return False
-        else:
-            return True
-
     def centerness(self, point, box, alpha=2.5):
         return np.exp(-alpha*((point[0]-box[0][0])**2+(point[1]-box[0][1])**2))
 
     def offset(self, point, box):
         return [box[0][0]-point[0], box[0][1]-point[1]]
 #         return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
-
-#     def is_positive_location_3d(self, point, box_center_3d, stride, calib_matrix):
-#         point_3d = coord_2d_to_3d(point, box_center_3d[2], calib_matrix)
-#         d = (box_center_3d[0] - point_3d[0])**2 + (box_center_3d[1] - point_3d[1])**2 + (box_center_3d[2] - point_3d[2])**2
-#         if d<self.radius*stride:
-#             return True
-#         else:
-#             return False
         
-    def is_positive_location(self, point, box, stride):
-        point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
-        box_center = box[0]
-        d = np.sqrt((box_center[0] - point[0])**2 + (box_center[1] - point[1])**2)
-        if d<self.radius*stride:
-            return True
-        else:
-            return False
-        
-    def gen_target(self, anns, shape, stride, calib_matrix):
-        shape =  [int(np.ceil(shape[0]/stride)), int(np.ceil(shape[1]/stride))]
+    def gen_target(self, anns, img_shape, stride, calib_matrix):
+        shape =  [int(np.ceil(img_shape[0]/stride)), int(np.ceil(img_shape[1]/stride))]
         category_target = np.zeros((shape[0], shape[1], len(self.meta_data['categories'])))
         attribute_target = np.zeros((shape[0], shape[1], len(self.meta_data['attributes'])))
         centerness_target = np.zeros((shape[0], shape[1], 1))
@@ -134,43 +187,73 @@ class NusceneDataset(Dataset):
         rotation_target = np.zeros((shape[0], shape[1], 1))
         dir_target = np.zeros((shape[0], shape[1], 2))
         velocity_target = np.zeros((shape[0], shape[1], 2))
-        for x in range(shape[0]):
-            for y in range(shape[1]):
-                boxes = []
-                for ann in anns:
-                    if self.is_positive_location([x, y], ann['box_2d'], stride) and ann['visibility']>self.visibility_thres and self.check_box_and_feature_map_level([x, y], ann['box_2d'], stride):
-                        boxes.append(ann)
-                if len(boxes)>0:
-                    # foreground location
-                    boxes.sort(key=lambda item: distance_to_center([x*stride, y*stride], item['box_2d']))
-                    box = boxes[0]
-                    box_2d = np.asarray(box['box_2d'], dtype=object)//stride
-#                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['rotation_angle_rad'])
-                    rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(box['rotation_angle_rad'])
+        
+        if self.transformed:
+            for ann in anns:
+                for (x,y) in ann['targets'][stride]:
+                    box_2d = np.asarray(ann['box_2d'], dtype=object)//stride
+#                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(ann['rotation_angle_rad'])
+                    rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(ann['rotation_angle_rad'])
 
-                    category_onehot = self.gen_category_onehot(box['category'])
+                    category_onehot = self.gen_category_onehot(ann['category'])
                     if category_onehot is None:
                         # skip void objects
                         continue
-                    category_target[x,y,:] = category_onehot
-                    attribute_target[x,y,:] = self.gen_attribute_onehot(box['attribute'])
-                    centerness_target[x,y,:] = self.centerness([x,y], box_2d)
-                    offset_target[x,y,:] = self.offset([x,y], box_2d)
-                    depth_target[x,y,:] = box['xyz_in_sensor_coor'][2]
-                    size_target[x,y,:] = box['box_size']
-                    rotation_target[x,y,:] = rad
-                    dir_target[x,y,:] = dir_cls
-                    velocity_target[x,y,:] = self.gen_velocity(box['velocity'])
-
-        if self.to_tensor:
-            return {'category': torch.FloatTensor(category_target), 'attribute': torch.FloatTensor(attribute_target), 
-                    'centerness':torch.FloatTensor(centerness_target),  'offset': torch.FloatTensor(offset_target), 
-                    'depth': torch.FloatTensor(depth_target),  'size': torch.FloatTensor(size_target), 
-                    'rotation': torch.FloatTensor(rotation_target), 'dir': torch.FloatTensor(dir_target), 'velocity': torch.FloatTensor(velocity_target)
-                   }
+                    category_target[y,x,:] = category_onehot
+                    attribute_target[y,x,:] = self.gen_attribute_onehot(ann['attribute'])
+                    centerness_target[y,x,:] = self.centerness([x,y], box_2d)
+                    offset_target[y,x,:] = self.offset([x,y], box_2d)
+                    depth_target[y,x,:] = ann['xyz_in_sensor_coor'][2]
+                    size_target[y,x,:] = ann['box_size']
+                    rotation_target[y,x,:] = rad
+                    dir_target[y,x,:] = dir_cls
+                    velocity_target[y,x,:] = self.gen_velocity(ann['velocity'])
         else:
-            return {'category': category_target, 'attribute': attribute_target, 
-                'centerness': centerness_target,  'offset': offset_target, 
-                'depth': depth_target,  'size': size_target, 
-                'rotation': rotation_target, 'dir': dir_target, 'velocity': velocity_target
+            for x in range(shape[1]):
+                for y in range(shape[0]):
+                    boxes = []
+                    for ann in anns:
+                        if is_positive_location([x, y], ann['box_2d'], stride, self.radius) and is_valid_box(ann['box_2d'], (img_shape[1],img_shape[0])) and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list):
+                            boxes.append(ann)
+                    if len(boxes)>0:
+                        # foreground location
+                        boxes.sort(key=lambda item: distance_to_center([x*stride+np.floor(stride/2), y*stride+np.floor(stride/2)], item['box_2d']))
+                        box = boxes[0]
+                        box_2d = np.asarray(box['box_2d'], dtype=object)//stride
+    #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['rotation_angle_rad'])
+                        rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(box['rotation_angle_rad'])
+
+                        category_onehot = self.gen_category_onehot(box['category'])
+                        if category_onehot is None:
+                            # skip void objects
+                            continue
+                            
+                        category_target[y,x,:] = category_onehot
+                        attribute_target[y,x,:] = self.gen_attribute_onehot(box['attribute'])
+                        centerness_target[y,x,:] = self.centerness([x,y], box_2d)
+                        offset_target[y,x,:] = self.offset([x,y], box_2d)
+                        depth_target[y,x,:] = box['xyz_in_sensor_coor'][2]
+                        size_target[y,x,:] = box['box_size']
+                        rotation_target[y,x,:] = rad
+                        dir_target[y,x,:] = dir_cls
+                        velocity_target[y,x,:] = self.gen_velocity(box['velocity'])
+
+        return {'category': torch.FloatTensor(category_target), 'attribute': torch.FloatTensor(attribute_target), 
+                'centerness':torch.FloatTensor(centerness_target),  'offset': torch.FloatTensor(offset_target), 
+                'depth': torch.FloatTensor(depth_target),  'size': torch.FloatTensor(size_target), 
+                'rotation': torch.FloatTensor(rotation_target), 'dir': torch.FloatTensor(dir_target), 'velocity': torch.FloatTensor(velocity_target)
                }
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('--file',type=str, 
+                        help='path_to_in_file')
+    parser.add_argument('--out',type=str, 
+                        help='path_to_out_file')
+    parser.add_argument('--num_worker',type=int, default=16,
+                        help='num_worker')
+    args = parser.parse_args()
+    
+    transform = NusceneDatasetTransform(num_worker=args.num_worker)
+    transform.transform(args.file, args.out)
+    

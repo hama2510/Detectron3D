@@ -27,8 +27,10 @@ class FCOSDetector(nn.Module):
     def init(self, ):
         self.model = self.create_model()
         if 'load_model' in self.config.model.keys() and self.config.model.load_model:
-            print('Loaded weight from {}'.format(self.config.model.load_model))
             self.load_model(self.config.model.load_model)
+            print('Loaded weight from {}'.format(self.config.model.load_model))
+        if self.config['multi_gpu']:
+            self.model = nn.DataParallel(self.model)
         if self.config.model['eval']:
             self.model.eval()
     
@@ -44,22 +46,28 @@ class FCOSDetector(nn.Module):
         else:
             print('Not support model {}'.format(config.model.model_name))
             exit()
-        if self.config['multi_gpu']:
-            model = nn.DataParallel(model)
         model.to(self.config['device'])
         return model
     
     def save_model(self, path):
         new_state_dict = OrderedDict()
-        for k, v in self.model.state_dict().items():
-            new_state_dict[k] = v
+        if self.config.multi_gpu:
+            for k, v in self.model.module.state_dict().items():
+                new_state_dict[k] = v
+        else:
+            for k, v in self.model.state_dict().items():
+                new_state_dict[k] = v
         torch.save(new_state_dict, path)
      
     def load_model(self, path):
         state_dict = torch.load(path)
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
-            new_state_dict[k] = v
+            if k.startswith('module.'):
+                name = k[7:] # remove `module.`
+            else:
+                name = k
+            new_state_dict[name] = v
         self.model.load_state_dict(new_state_dict)
         
     def tensor_to_numpy(self, pred):
@@ -123,9 +131,9 @@ class FCOSDetector(nn.Module):
             indices = np.unique(indices, axis=0)
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
-#                 x, y = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
-                x = int(idx[0]+offset_map[idx[0], idx[1],0])*stride + np.floor(stride) 
-                y = int(idx[1]+offset_map[idx[0], idx[1],1])*stride + np.floor(stride) 
+#                 y, x = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
+                y = int(idx[0]+offset_map[idx[0], idx[1],0])*stride + np.floor(stride) 
+                x = int(idx[1]+offset_map[idx[0], idx[1],1])*stride + np.floor(stride) 
                 depth = np.exp(depth_map[idx[0]][idx[1],0])
 #                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)

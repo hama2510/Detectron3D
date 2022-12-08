@@ -30,7 +30,10 @@ class FCOSDetector(nn.Module):
             self.load_model(self.config.model.load_model)
             print('Loaded weight from {}'.format(self.config.model.load_model))
         if self.config['multi_gpu']:
-            self.model = nn.DataParallel(self.model)
+            if 'gpus' in self.config:
+                self.model = nn.DataParallel(self.model, device_ids=self.config.gpus)
+            else:
+                self.model = nn.DataParallel(self.model)
         if self.config.model['eval']:
             self.model.eval()
     
@@ -69,6 +72,16 @@ class FCOSDetector(nn.Module):
                 name = k
             new_state_dict[name] = v
         self.model.load_state_dict(new_state_dict)
+        
+    def item_tensor_to_numpy(self, key, item):
+        if key=='category':
+            item = torch.clamp(item, min=1e-4, max=1-1e-4).detach().cpu().numpy()
+        elif key=='attribute' or key=='dir':
+            item = nn.functional.softmax(item, dim=1).detach().cpu().numpy()
+        else:
+            item = item.detach().cpu().numpy()
+        item = np.moveaxis(item, 0, -1)
+        return item
         
     def tensor_to_numpy(self, pred):
         output = {'sample_token':pred['sample_token'], 'calibration_matrix':pred['calibration_matrix'], 'pred':{}}

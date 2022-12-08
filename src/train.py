@@ -51,34 +51,34 @@ if __name__ == '__main__':
     
     for epoch in range(1, config.epochs+1):
         # train
-        for model_id in range(0, len(models)):
-            models[model_id]['loss'] = logger.init_loss_log()
-        with tqdm(dataloader_train, desc="Train") as tepoch:
-            for step, samples in enumerate(tepoch):
-                loss_str = ''
-                for model_id in range(0, len(models)):
-                    model = models[model_id]['model']
-                    optimizer = models[model_id]['optimizer']
+#         for model_id in range(0, len(models)):
+#             models[model_id]['loss'] = logger.init_loss_log()
+#         with tqdm(dataloader_train, desc="Train") as tepoch:
+#             for step, samples in enumerate(tepoch):
+#                 loss_str = ''
+#                 for model_id in range(0, len(models)):
+#                     model = models[model_id]['model']
+#                     optimizer = models[model_id]['optimizer']
 
-                    imgs = samples['img']
-                    targets = samples['target']
+#                     imgs = samples['img']
+#                     targets = samples['target']
 
-                    imgs = imgs.to(config.device)
-                    pred = model(imgs)
-                    optimizer.zero_grad()
-                    loss, loss_log = criterion(targets, pred)
-                    loss.backward()
-                    optimizer.step()
+#                     imgs = imgs.to(config.device)
+#                     pred = model(imgs)
+#                     optimizer.zero_grad()
+#                     loss, loss_log = criterion(targets, pred)
+#                     loss.backward()
+#                     optimizer.step()
 
-                    models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
-                    for stride in loss_log.keys():
-                        for key in loss_log[stride].keys():
-                            models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
+#                     models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
+#                     for stride in loss_log.keys():
+#                         for key in loss_log[stride].keys():
+#                             models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
                 
-                    loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
-                loss_str = loss_str[:-1]
-                tepoch.set_postfix(ep=epoch, loss=loss_str)
-                sleep(0.1)
+#                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
+#                 loss_str = loss_str[:-1]
+#                 tepoch.set_postfix(ep=epoch, loss=loss_str)
+#                 sleep(0.1)
                 
 #         # valid
         for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
@@ -98,11 +98,13 @@ if __name__ == '__main__':
                     for key in pred.keys():
                         item['pred'][key]={}
                         for sub_key in pred[key].keys():
-                            item['pred'][key][sub_key] = pred[key][sub_key][i]
-                    models[model_id]['pred'].append(models[model_id]['model'].tensor_to_numpy(item))
+                            item['pred'][key][sub_key] = model.item_tensor_to_numpy(sub_key, pred[key][sub_key][i])
+#                             item['pred'][key][sub_key] = pred[key][sub_key][i]
+                    models[model_id]['pred'].append(item)
 
         for model_id in range(0, len(models)):
-            preds = models[model_id]['model'].transform_predicts(models[model_id]['pred'], det_thres=models[model_id]['config'].det_thres, nms_thres=models[model_id]['config'].nms_thres)
+            model = models[model_id]['model']
+            preds = model.transform_predicts(models[model_id]['pred'], det_thres=models[model_id]['config'].det_thres, nms_thres=models[model_id]['config'].nms_thres)
             if len(preds)>0:
                 if models[model_id]['config'].data.dataset_name == 'v1.0-mini':
                     metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False)

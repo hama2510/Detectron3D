@@ -97,7 +97,7 @@ class NusceneDatasetTransform:
     
 class NusceneDataset(Dataset):
     
-    def __init__(self, data_file, config):
+    def __init__(self, data_file, config, return_target=True):
         self.transformed = config.data.transformed
         self.image_root = config.data.image_root
         if not self.image_root.endswith('/'):
@@ -107,6 +107,7 @@ class NusceneDataset(Dataset):
         self.stride_list = STRIDE_LIST
         self.m_list = M_LIST
         self.radius = RADIUS
+        self.return_target = return_target
         
     def __len__(self):
         return len(self.data)
@@ -123,8 +124,9 @@ class NusceneDataset(Dataset):
 
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
         sample = {'sample_token':item['sample_token'], 'calibration_matrix':item['calibration_matrix'], 'img_path':item['image'], 'img':img, 'target':{}}
-        for stride in self.stride_list:
-            sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride, item['calibration_matrix'])
+        if self.return_target:
+            for stride in self.stride_list:
+                sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride, item['calibration_matrix'])
         return sample
 
     def rotation_angle_to_pi_and_bin(self, rotation_angle):

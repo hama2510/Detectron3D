@@ -19,6 +19,12 @@ import pickle
 from utils.logger import Logger
 from time import sleep
 import random
+import torch
+from torch import optim
+from numba import cuda
+from datetime import datetime
+# import torch.multiprocessing as mp
+
 
 random.seed(42)
 np.random.seed(42)
@@ -34,7 +40,7 @@ if __name__ == '__main__':
 
     dataset_train = NusceneDataset(config.data.train, config=config)
     dataloader_train = DataLoader(dataset_train, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    dataset_val = NusceneDataset(config.data.val, config=config)
+    dataset_val = NusceneDataset(config.data.val, config=config, return_target=False)
     dataloader_val = DataLoader(dataset_val, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     criterion = Criterion(device=config.device)
     evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
@@ -50,30 +56,33 @@ if __name__ == '__main__':
         logger.create_log_file(model_config.model.save_dir)
     
     for epoch in range(1, config.epochs+1):
+        for model_id in range(0, len(models)):
+            models[model_id]['loss'] = logger.init_loss_log()
+            models[model_id]['pred'] = []
+            
         # train
-#         for model_id in range(0, len(models)):
-#             models[model_id]['loss'] = logger.init_loss_log()
+        print('Training ...')
+        for step, samples in enumerate(dataloader_train):
 #         with tqdm(dataloader_train, desc="Train") as tepoch:
 #             for step, samples in enumerate(tepoch):
-#                 loss_str = ''
-#                 for model_id in range(0, len(models)):
-#                     model = models[model_id]['model']
-#                     optimizer = models[model_id]['optimizer']
+            loss_str = ''
+            imgs = samples['img']
+            targets = samples['target']
+            imgs = imgs.to(config.device)
+            for model_id in range(0, len(models)):
+                model = models[model_id]['model']
+                optimizer = models[model_id]['optimizer']
 
-#                     imgs = samples['img']
-#                     targets = samples['target']
+                pred = model(imgs)
+                optimizer.zero_grad()
+                loss, loss_log = criterion(targets, pred)
+                loss.backward()
+                optimizer.step()
 
-#                     imgs = imgs.to(config.device)
-#                     pred = model(imgs)
-#                     optimizer.zero_grad()
-#                     loss, loss_log = criterion(targets, pred)
-#                     loss.backward()
-#                     optimizer.step()
-
-#                     models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
-#                     for stride in loss_log.keys():
-#                         for key in loss_log[stride].keys():
-#                             models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
+                models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
+                for stride in loss_log.keys():
+                    for key in loss_log[stride].keys():
+                        models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
                 
 #                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
 #                 loss_str = loss_str[:-1]
@@ -81,7 +90,9 @@ if __name__ == '__main__':
 #                 sleep(0.1)
                 
 #         # valid
-        for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
+        print('Validating ...')
+        for step, samples in enumerate(dataloader_val):
+#         for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
             imgs = samples['img']
             imgs = imgs.to(config.device)
             sample_token = samples['sample_token']
@@ -101,7 +112,8 @@ if __name__ == '__main__':
                             item['pred'][key][sub_key] = model.item_tensor_to_numpy(sub_key, pred[key][sub_key][i])
 #                             item['pred'][key][sub_key] = pred[key][sub_key][i]
                     models[model_id]['pred'].append(item)
-
+                del pred
+        start = datetime.now()
         for model_id in range(0, len(models)):
             model = models[model_id]['model']
             preds = model.transform_predicts(models[model_id]['pred'], det_thres=models[model_id]['config'].det_thres, nms_thres=models[model_id]['config'].nms_thres)
@@ -123,6 +135,5 @@ if __name__ == '__main__':
                 models[model_id]['best_score'] = nds
 
             logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
-#             print('epoch={},model={},loss={},nds={}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), np.round(nds, decimals=2)))
-            models[model_id]['pred'] = []
-        
+            print('epoch={},model={},loss={},nds={:.2f}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), nds))
+        print(datetime.now()-start)

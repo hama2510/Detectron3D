@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.parallel import DistributedDataParallel
 import numpy as np
 from .fcos3d import FCOS3D
 from .mobilenet_v2 import MobileNetv2
@@ -7,7 +8,7 @@ from .resnet101 import ResNet101
 from .resnet101_deformable import ResNet101DCN
 import pickle
 from pyquaternion import Quaternion
-import sys
+import sys, os
 sys.path.append('..')
 from utils.nms import rotated_nms
 from utils.camera import coord_2d_to_3d, sensor_coord_to_real_coord
@@ -29,10 +30,14 @@ class FCOSDetector(nn.Module):
         if 'load_model' in self.config.model.keys() and self.config.model.load_model:
             self.load_model(self.config.model.load_model)
             print('Loaded weight from {}'.format(self.config.model.load_model))
-        if self.config['multi_gpu']:
+        if 'multi_gpu'in self.config.keys() and self.config.multi_gpu:
+#             os.environ["MASTER_ADDR"] = "localhost"
+#             os.environ["MASTER_PORT"] = "12355"
             if 'gpus' in self.config:
+#                 self.model = DistributedDataParallel(self.model, device_ids=self.config.gpus)
                 self.model = nn.DataParallel(self.model, device_ids=self.config.gpus)
             else:
+#                 self.model = DistributedDataParallel(self.model)
                 self.model = nn.DataParallel(self.model)
         if self.config.model['eval']:
             self.model.eval()
@@ -75,11 +80,10 @@ class FCOSDetector(nn.Module):
         
     def item_tensor_to_numpy(self, key, item):
         if key=='category':
-            item = torch.clamp(item, min=1e-4, max=1-1e-4).detach().cpu().numpy()
+            item = torch.clamp(item, min=1e-4, max=1-1e-4)
         elif key=='attribute' or key=='dir':
-            item = nn.functional.softmax(item, dim=1).detach().cpu().numpy()
-        else:
-            item = item.detach().cpu().numpy()
+            item = nn.functional.softmax(item, dim=1)
+        item = item.detach().cpu().numpy()
         item = np.moveaxis(item, 0, -1)
         return item
         

@@ -14,6 +14,8 @@ from utils.nms import rotated_nms
 from utils.camera import coord_2d_to_3d, sensor_coord_to_real_coord
 from datetime import datetime
 from collections import OrderedDict
+from functools import partial
+from multiprocessing import Pool
 
 class FCOSDetector(nn.Module):
     def __init__(self, config):
@@ -31,8 +33,6 @@ class FCOSDetector(nn.Module):
             self.load_model(self.config.model.load_model)
             print('Loaded weight from {}'.format(self.config.model.load_model))
         if 'multi_gpu'in self.config.keys() and self.config.multi_gpu:
-#             os.environ["MASTER_ADDR"] = "localhost"
-#             os.environ["MASTER_PORT"] = "12355"
             if 'gpus' in self.config:
 #                 self.model = DistributedDataParallel(self.model, device_ids=self.config.gpus)
                 self.model = nn.DataParallel(self.model, device_ids=self.config.gpus)
@@ -60,12 +60,14 @@ class FCOSDetector(nn.Module):
     def save_model(self, path):
         new_state_dict = OrderedDict()
         if self.config.multi_gpu:
-            for k, v in self.model.module.state_dict().items():
-                new_state_dict[k] = v
+            torch.save(self.model.module.state_dict(), path)
+#             for k, v in self.model.module.state_dict().items():
+#                 new_state_dict[k] = v
         else:
-            for k, v in self.model.state_dict().items():
-                new_state_dict[k] = v
-        torch.save(new_state_dict, path)
+            torch.save(self.model.state_dict(), path)
+#             for k, v in self.model.state_dict().items():
+#                 new_state_dict[k] = v
+#         torch.save(new_state_dict, path)
      
     def load_model(self, path):
         state_dict = torch.load(path)
@@ -91,7 +93,7 @@ class FCOSDetector(nn.Module):
         output = {'sample_token':pred['sample_token'], 'calibration_matrix':pred['calibration_matrix'], 'pred':{}}
         for key in pred['pred'].keys():
             output['pred'][key] = {}
-            category_map = torch.clamp(pred['pred'][key]['category'], min=1e-4, max=1-1e-4).detach().cpu().numpy()
+            category_map = torch.clamp(pred['pred'][key]['category'], min=0, max=1).detach().cpu().numpy()
             attribute_map = nn.functional.softmax(pred['pred'][key]['attribute'], dim=1).detach().cpu().numpy()
 #             attribute_map = pred['pred'][key]['attribute'].detach().cpu().numpy()
             centerness_map = pred['pred'][key]['centerness'].detach().cpu().numpy()
@@ -197,5 +199,11 @@ class FCOSDetector(nn.Module):
         boxes = []
         for pred in preds:
             boxes.extend(self.transform_predict(pred, det_thres=det_thres, nms_thres=nms_thres))
+            
+        # pool = Pool(self.config.num_worker)
+        # data = pool.imap(partial(self.transform_predict, det_thres=det_thres, nms_thres=nms_thres), preds)
+        # pool.close()
+        # pool.join()
+        
         return boxes
     

@@ -16,6 +16,7 @@ from datetime import datetime
 from collections import OrderedDict
 from functools import partial
 from multiprocessing import Pool
+from datetime import datetime
 
 class FCOSDetector(nn.Module):
     def __init__(self, config):
@@ -126,6 +127,11 @@ class FCOSDetector(nn.Module):
             output['pred'][key]['velocity'] = velocity_map
         return output
 
+class FCOSTransformer():
+    def __init__(self, config):
+        self.config = config
+        self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
+        
     def transform_predict(self, pred, det_thres=0.05, nms_thres=0.3):
         boxes = []
         sample_token = pred['sample_token']
@@ -191,19 +197,26 @@ class FCOSDetector(nn.Module):
                     'detection_score': sc,
                     'attribute_name': attribute,
                 })
-        keep_indices = rotated_nms(boxes, calib_matrix, nms_thres=nms_thres)
-        boxes = [boxes[i] for i in keep_indices]
-        return boxes
+#         keep_indices = rotated_nms(boxes, calib_matrix, nms_thres=nms_thres)
+#         boxes = [boxes[i] for i in keep_indices]
+        return boxes, calib_matrix
     
-    def transform_predicts(self, preds, det_thres=0.05, nms_thres=0.3):
+    def transform_predicts(self, preds):
         boxes = []
-        for pred in preds:
-            boxes.extend(self.transform_predict(pred, det_thres=det_thres, nms_thres=nms_thres))
-            
-        # pool = Pool(self.config.num_worker)
-        # data = pool.imap(partial(self.transform_predict, det_thres=det_thres, nms_thres=nms_thres), preds)
-        # pool.close()
-        # pool.join()
-        
+        if self.config.num_workers<=1:
+            for pred in preds:
+                boxes.extend(self.transform_predict(pred, det_thres=self.config.det_thres))
+        else:
+            start = datetime.now()
+            pool = Pool(self.config.num_workers)
+            data = list(pool.imap(partial(self.transform_predict, det_thres=self.config.det_thres, nms_thres=self.config.nms_thres), preds))
+            pool.close()
+            pool.join()
+            print('Transforming prediction at ', datetime.now()-start)
+            start = datetime.now()
+            for item, calib_matrix in data:
+                keep_indices = rotated_nms(item, calib_matrix, nms_thres=self.config.nms_thres)
+                boxes.extend([item[i] for i in keep_indices])
+            print('Running NMS at ', datetime.now()-start)
         return boxes
     

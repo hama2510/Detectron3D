@@ -5,6 +5,8 @@ import os
 import shutil
 from nuscenes.eval.common.loaders import load_gt
 from nuscenes.eval.detection.data_classes import DetectionBox
+from functools import partial
+from multiprocessing import Pool
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -37,7 +39,7 @@ class Evaluation:
                     'attribute_name': '',
                 }
     
-    def clear():
+    def clear(self, ):
          shutil.rmtree(self.output_dir) 
             
     def evaluate(self, preds, eval_set='val', verbose=False, clear=True):

@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from data.nuscene_dataset import NusceneDataset
-from model.fcos3d_detector import FCOSDetector
+from model.fcos3d_detector import FCOSDetector, FCOSTransformer
 from criterion.losses import Criterion
 import argparse
 from omegaconf import OmegaConf
@@ -14,7 +14,6 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import sys, os
 from valid import Evaluation
-# from copy import deepcopy
 import pickle
 from utils.logger import Logger
 from time import sleep
@@ -23,12 +22,13 @@ import torch
 from torch import optim
 from numba import cuda
 from datetime import datetime
-# import torch.multiprocessing as mp
 
 
 random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+torch.cuda.manual_seed_all(42)
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 if __name__ == '__main__':
@@ -45,6 +45,7 @@ if __name__ == '__main__':
     criterion = Criterion(device=config.device)
     evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
     logger = Logger()
+    transformer = FCOSTransformer(config)
 
     models = []
     for model_id, item in enumerate(config.models):
@@ -56,10 +57,6 @@ if __name__ == '__main__':
         logger.create_log_file(model_config.model.save_dir)
     
     for epoch in range(1, config.epochs+1):
-        for model_id in range(0, len(models)):
-            models[model_id]['loss'] = logger.init_loss_log()
-            models[model_id]['pred'] = []
-            
         # train
         print('Training ...')
         for step, samples in enumerate(dataloader_train):
@@ -83,11 +80,11 @@ if __name__ == '__main__':
                 for stride in loss_log.keys():
                     for key in loss_log[stride].keys():
                         models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
-                
-#                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
-#                 loss_str = loss_str[:-1]
-#                 tepoch.set_postfix(ep=epoch, loss=loss_str)
-#                 sleep(0.1)
+
+#                 loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
+#             loss_str = loss_str[:-1]
+#             tepoch.set_postfix(ep=epoch, loss=loss_str)
+#             sleep(0.1)
                 
 #         # valid
         print('Validating ...')
@@ -100,7 +97,6 @@ if __name__ == '__main__':
             for model_id in range(0, len(models)):
                 model = models[model_id]['model']
                 pred = model(imgs)
-                arr = []
                 for i in range(len(sample_token)):
                     calib_matrix = {}
                     for key in calibration_matrix.keys():
@@ -110,13 +106,12 @@ if __name__ == '__main__':
                         item['pred'][key]={}
                         for sub_key in pred[key].keys():
                             item['pred'][key][sub_key] = model.item_tensor_to_numpy(sub_key, pred[key][sub_key][i])
-#                             item['pred'][key][sub_key] = pred[key][sub_key][i]
                     models[model_id]['pred'].append(item)
                 del pred
         start = datetime.now()
         for model_id in range(0, len(models)):
-            model = models[model_id]['model']
-            preds = model.transform_predicts(models[model_id]['pred'], det_thres=models[model_id]['config'].det_thres, nms_thres=models[model_id]['config'].nms_thres)
+#             model = models[model_id]['model']
+            preds = transformer.transform_predicts(models[model_id]['pred'])
             if len(preds)>0:
                 if models[model_id]['config'].data.dataset_name == 'v1.0-mini':
                     metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False)
@@ -126,6 +121,16 @@ if __name__ == '__main__':
             else:
                 metrics_summary = {}
                 nds = 0
+            
+            logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
+            print('epoch={},model={},loss={},nds={:.2f}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), nds))
+            
+            del models[model_id]['loss']
+            del models[model_id]['pred']
+            del metrics_summary
+            models[model_id]['loss'] = logger.init_loss_log()
+            models[model_id]['pred'] = []
+            
             if config.save_best:
                 if nds>=models[model_id]['best_score']:
                     model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
@@ -133,7 +138,6 @@ if __name__ == '__main__':
                 model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
-
-            logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
-            print('epoch={},model={},loss={},nds={:.2f}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), nds))
+            
+            
         print(datetime.now()-start)

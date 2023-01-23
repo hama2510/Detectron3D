@@ -30,5 +30,10 @@ class FusedFPN(nn.Module):
     def forward(self, x):
         outs = OrderedDict()
         x = self.fpn(x)
-        outs['p4'] = torch.cat((x['feat1'], self.up(x['feat2'])), 1)
+        x2_up = self.up(x['feat2'])
+        x2_up = x2_up[:,:,:x['feat1'].shape[2],:]
+#         print(x['feat1'].shape, x2_up.shape)
+#         outs['p4'] = torch.sum((x['feat1'], x2_up), 1)
+#         print(x2_up.shape, x['feat1'].shape)
+        outs['p4'] = x['feat1']+x2_up
         return outs

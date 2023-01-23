@@ -2,13 +2,14 @@ import torch
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
 import numpy as np
+import sys, os
+# sys.path.append('./network')
 from .network.centernet3d import CenterNet3D
 from .network.mobilenet_v2 import MobileNetv2
 from .network.resnet101 import ResNet101
 from .network.resnet101_deformable import ResNet101DCN
 import pickle
 from pyquaternion import Quaternion
-import sys, os
 sys.path.append('..')
 from utils.nms import rotated_nms
 from utils.camera import coord_2d_to_3d, sensor_coord_to_real_coord
@@ -22,27 +23,6 @@ from .base_detector import BaseDetector
 class CenterNet3DDetector(BaseDetector):
     def __init__(self, config):
         super().__init__(config)
-        # self.config = config
-        # self.meta_data = pickle.load(open(config.data.meta_data, 'rb'))
-        # self.init()
-
-    def forward(self, x):
-        return self.model(x)
-    
-    def init(self, ):
-        self.model = self.create_model()
-        if 'load_model' in self.config.model.keys() and self.config.model.load_model:
-            self.load_model(self.config.model.load_model)
-            print('Loaded weight from {}'.format(self.config.model.load_model))
-        if 'multi_gpu'in self.config.keys() and self.config.multi_gpu:
-            if 'gpus' in self.config:
-#                 self.model = DistributedDataParallel(self.model, device_ids=self.config.gpus)
-                self.model = nn.DataParallel(self.model, device_ids=self.config.gpus)
-            else:
-#                 self.model = DistributedDataParallel(self.model)
-                self.model = nn.DataParallel(self.model)
-        if self.config.model['eval']:
-            self.model.eval()
     
     def create_model(self,):
         if self.config.model.model_name=='mobilenet':

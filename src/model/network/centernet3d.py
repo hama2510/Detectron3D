@@ -10,6 +10,7 @@ class CenterNet3D(nn.Module):
         self.feature_extractor = feature_extractor
         self.fpn = FusedFPN(self.feature_extractor.channel_num, 256)
         self.cls_head = ClassificationHead(256, num_cate, num_attr, (3,3), 1, 4)
+        self.regress_head = RegressionHead(256, (3,3), 1, 4)
 
     def forward(self, x):
         features = self.feature_extractor(x)

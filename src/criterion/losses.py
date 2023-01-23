@@ -120,7 +120,10 @@ class Criterion(nn.Module):
 
         category_loss = self.focal_loss(pred['category'], target['category'])
         attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)
-        centerness_loss = self.bce_loss(pred['centerness'], target['centerness'], masked)
+        if 'centerness' in pred.keys() and 'centerness' in target.keys():
+            centerness_loss = self.bce_loss(pred['centerness'], target['centerness'], masked)
+        else:
+            centerness_loss = 0
         offset_loss = self.smooth_l1_loss(pred['offset'], target['offset'], masked)
         depth_loss = self.smooth_l1_loss(torch.exp(pred['depth']), target['depth'], masked)
         size_loss = self.smooth_l1_loss(pred['size'], target['size'], masked)

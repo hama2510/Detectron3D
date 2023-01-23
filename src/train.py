@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from data.nuscene_dataset import NusceneDataset
 from model.fcos3d_detector import FCOSDetector, FCOSTransformer
+from model.centernet3d_detector import CenterNet3DDetector, CenterNet3DTransformer
 from criterion.losses import Criterion
 import argparse
 from omegaconf import OmegaConf
@@ -31,6 +32,12 @@ torch.cuda.manual_seed(42)
 torch.cuda.manual_seed_all(42)
 torch.multiprocessing.set_sharing_strategy('file_system')
 
+def get_detector(model_config):
+    if model_config.model.detector_name=='fcos3d':
+        return FCOSDetector(model_config), FCOSTransformer(model_config)
+    elif model_config.model.detector_name=='centernet3d':
+        return CenterNet3DDetector(model_config), CenterNet3DTransformer(model_config)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--config',type=str, 
@@ -45,15 +52,15 @@ if __name__ == '__main__':
     criterion = Criterion(device=config.device)
     evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
     logger = Logger()
-    transformer = FCOSTransformer(config)
+    
 
     models = []
     for model_id, item in enumerate(config.models):
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
-        model = FCOSDetector(model_config)
+        model, transformer = get_detector(model_config)
         optimizer = optim.Adam(model.parameters(), lr=config.lr)
-        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
+        models.append({'model':model, 'transformer':transformer, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
         logger.create_log_file(model_config.model.save_dir)
     
     for epoch in range(1, config.epochs+1):
@@ -111,6 +118,7 @@ if __name__ == '__main__':
         start = datetime.now()
         for model_id in range(0, len(models)):
 #             model = models[model_id]['model']
+            transformer = models[model_id]['transformer']
             preds = transformer.transform_predicts(models[model_id]['pred'])
             if len(preds)>0:
                 if models[model_id]['config'].data.dataset_name == 'v1.0-mini':

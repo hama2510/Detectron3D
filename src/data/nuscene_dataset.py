@@ -15,8 +15,10 @@ import imagesize
 from functools import partial
 from multiprocessing import Pool
 
-STRIDE_LIST = [8, 16, 32, 64, 128]
-M_LIST = [0, 64, 128, 256, 512, np.inf]
+# STRIDE_LIST = [8, 16, 32, 64, 128]
+# M_LIST = [0, 64, 128, 256, 512, np.inf]
+STRIDE_LIST = [16]
+M_LIST = [0, np.inf]
 RADIUS = 1.5
     
 def check_box_and_feature_map_level(point, box, stride, m_list, stride_list):

@@ -5,6 +5,8 @@ import os
 import shutil
 from nuscenes.eval.common.loaders import load_gt
 from nuscenes.eval.detection.data_classes import DetectionBox
+from functools import partial
+from multiprocessing import Pool
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -36,8 +38,11 @@ class Evaluation:
                     'detection_score': 0,
                     'attribute_name': '',
                 }
-         
-    def evaluate(self, preds, eval_set='val', verbose=False):
+    
+    def clear(self, ):
+         shutil.rmtree(self.output_dir) 
+            
+    def evaluate(self, preds, eval_set='val', verbose=False, clear=True):
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
@@ -62,5 +67,6 @@ class Evaluation:
             json.dump(metrics_summary, f, indent=2)
         
         metrics_summary = json.load(open('/home/hotta/kiennt/Detectron3D/tmp/metrics_summary.json', 'r'))
-        shutil.rmtree(self.output_dir) 
+        if clear:
+            self.clear() 
         return metrics_summary

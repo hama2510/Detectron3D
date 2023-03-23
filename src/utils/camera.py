@@ -54,7 +54,7 @@ def box_3d_to_2d(box, calibration_matrix, calibrated=True):
 
 def xywh_to_xyxy(box):
     c, w, h = box
-    return [[c[0]-box[1], c[1]-box[2]], [c[0]+box[1], c[0]+box[2]]]
+    return [[c[0]-w//2, c[1]-h//2], [c[0]+w//2, c[1]+h//2]]
 
 def is_inside(point, box):
     x,y = point
@@ -63,7 +63,7 @@ def is_inside(point, box):
         return True
 
 def distance_to_center(point, box):
-    return np.sum((point[0]-box[0][0])**2+(point[1]-box[0][1])**2)
+    return np.sqrt((point[0]-box[0][0])**2+(point[1]-box[0][1])**2)
 
 def cal_area(box):
     return box[1]*box[2]

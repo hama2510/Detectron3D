@@ -106,7 +106,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum()/num_pos
+                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).mean(dim=1).sum()/num_pos
 
     def stride_to_feat_level(self, stride):
         return int(np.log2(stride))

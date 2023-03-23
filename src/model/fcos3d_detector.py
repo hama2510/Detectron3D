@@ -167,12 +167,7 @@ class FCOSTransformer():
                 rotation = np.arcsin(rotation_map[idx[0],idx[1],0])
                 dir = np.argmax(dir_map[idx[0],idx[1],:])
                 if dir==0:
-                    if rotation<0:
-                        rotation-=np.pi/2
-                    else:
-                        rotation+=np.pi/2
-                else:
-                    if rotation<0:
+                    if rotation>0:
                         rotation+=np.pi/2
                     else:
                         rotation-=np.pi/2

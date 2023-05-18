@@ -1,5 +1,6 @@
 from nuscenes.nuscenes import NuScenes
 from nuscenes.eval.detection.evaluate import *
+from nuscenes.eval.detection.render import visualize_sample
 import json
 import os
 import shutil
@@ -42,7 +43,7 @@ class Evaluation:
     def clear(self, ):
          shutil.rmtree(self.output_dir) 
             
-    def evaluate(self, preds, eval_set='val', verbose=False, clear=True):
+    def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05):
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
@@ -61,6 +62,26 @@ class Evaluation:
         with open(self.cfg_path, 'r') as _f:
             cfg_ = DetectionConfig.deserialize(json.load(_f))
         nusc_eval = DetectionEval(self.nusc, config=cfg_, result_path=self.result_path, eval_set=eval_set, output_dir=self.output_dir, verbose=verbose)
+        
+        if plot_examples > 0:
+            # Select a random but fixed subset to plot.
+            random.seed(42)
+            sample_tokens = list(nusc_eval.sample_tokens)
+            random.shuffle(sample_tokens)
+            sample_tokens = sample_tokens[:plot_examples]
+
+            # Visualize samples.
+            example_dir = os.path.join(self.output_dir, 'examples')
+            os.makedirs(example_dir, exist_ok=True)
+            for sample_token in sample_tokens:
+                visualize_sample(self.nusc,
+                                 sample_token,
+                                 nusc_eval.gt_boxes if nusc_eval.eval_set != 'test' else EvalBoxes(),
+                                 nusc_eval.pred_boxes,
+                                 conf_th=conf_th,
+                                 eval_range=max(nusc_eval.cfg.class_range.values()),
+                                 savepath=os.path.join(example_dir, '{}.png'.format(sample_token)))
+                
         metrics, metric_data_list = nusc_eval.evaluate()
         metrics_summary = metrics.serialize()
         with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:

@@ -22,6 +22,7 @@ import torch
 from torch import optim
 from numba import cuda
 from datetime import datetime
+from lion_pytorch import Lion
 
 
 random.seed(42)
@@ -52,44 +53,46 @@ if __name__ == '__main__':
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
         model = FCOSDetector(model_config)
-        optimizer = optim.Adam(model.parameters(), lr=config.lr)
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+#         optimizer = Lion(model.parameters(), lr=config.lr)
         models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
         logger.create_log_file(model_config.model.save_dir)
     
     for epoch in range(1, config.epochs+1):
         # train
         print('Training ...')
-        for step, samples in enumerate(dataloader_train):
-#         with tqdm(dataloader_train, desc="Train") as tepoch:
-#             for step, samples in enumerate(tepoch):
-            loss_str = ''
-            imgs = samples['img']
-            targets = samples['target']
-            imgs = imgs.to(config.device)
-            for model_id in range(0, len(models)):
-                model = models[model_id]['model']
-                optimizer = models[model_id]['optimizer']
+#         for step, samples in enumerate(dataloader_train):
+        with tqdm(dataloader_train, desc="Train") as tepoch:
+            for step, samples in enumerate(tepoch):
+                loss_str = ''
+                imgs = samples['img']
+                targets = samples['target']
+                imgs = imgs.to(config.device)
+                for model_id in range(0, len(models)):
+                    model = models[model_id]['model']
+                    optimizer = models[model_id]['optimizer']
 
-                pred = model(imgs)
-                optimizer.zero_grad()
-                loss, loss_log = criterion(targets, pred)
-                loss.backward()
-                optimizer.step()
+                    pred = model(imgs)
+                    optimizer.zero_grad()
+                    loss, loss_log = criterion(targets, pred)
+                    loss.backward()
+                    optimizer.step()
 
-                models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
-                for stride in loss_log.keys():
-                    for key in loss_log[stride].keys():
-                        models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
+                    models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
+                    for stride in loss_log.keys():
+                        for key in loss_log[stride].keys():
+                            models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
 
-#                 loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
-#             loss_str = loss_str[:-1]
-#             tepoch.set_postfix(ep=epoch, loss=loss_str)
-#             sleep(0.1)
+                    loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
+                loss_str = loss_str[:-1]
+                tepoch.set_postfix(ep=epoch, loss=loss_str)
+                sleep(0.1)
+#                 break
                 
 #         # valid
         print('Validating ...')
-        for step, samples in enumerate(dataloader_val):
-#         for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
+#         for step, samples in enumerate(dataloader_val):
+        for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
             imgs = samples['img']
             imgs = imgs.to(config.device)
             sample_token = samples['sample_token']
@@ -112,6 +115,9 @@ if __name__ == '__main__':
         for model_id in range(0, len(models)):
 #             model = models[model_id]['model']
             preds = transformer.transform_predicts(models[model_id]['pred'])
+            
+            del models[model_id]['pred']
+            models[model_id]['pred'] = []
             if len(preds)>0:
                 if models[model_id]['config'].data.dataset_name == 'v1.0-mini':
                     metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False)
@@ -125,11 +131,9 @@ if __name__ == '__main__':
             logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
             print('epoch={},model={},loss={},nds={:.2f}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), nds))
             
-            del models[model_id]['loss']
-            del models[model_id]['pred']
             del metrics_summary
+            del models[model_id]['loss']
             models[model_id]['loss'] = logger.init_loss_log()
-            models[model_id]['pred'] = []
             
             if config.save_best:
                 if nds>=models[model_id]['best_score']:
@@ -138,6 +142,4 @@ if __name__ == '__main__':
                 model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
-            
-            
         print(datetime.now()-start)

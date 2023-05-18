@@ -78,6 +78,7 @@ class Criterion(nn.Module):
 
     def bce_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
+        pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
         if masked is None:
             return nn.BCELoss()(pred, target)
         else:
@@ -98,7 +99,7 @@ class Criterion(nn.Module):
 
     def cross_entropy_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
-        pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
+#         pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
         if masked is None:
             return nn.CrossEntropyLoss()(pred, target)
         else:
@@ -106,7 +107,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).mean(dim=1).sum()/num_pos
+                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).mean(axis=1).sum()/num_pos
 
     def stride_to_feat_level(self, stride):
         return int(np.log2(stride))
@@ -127,7 +128,7 @@ class Criterion(nn.Module):
         rotation_loss = self.smooth_l1_loss(pred['rotation'], target['rotation'], masked)
         dir_loss = self.cross_entropy_loss(pred['dir'], target['dir'], masked)
         velocity_loss = self.smooth_l1_loss(pred['velocity'], target['velocity'], masked)
-        
+#         print(category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss)
         return category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss
 
         
@@ -136,7 +137,7 @@ class Criterion(nn.Module):
         loss_log = {}
         for stride in target.keys():
             category_loss, attribute_loss, offset_loss, depth_loss, size_loss, rotation_loss, velocity_loss, dir_loss, centerness_loss = self.loss(pred, target, int(stride))
-            loss = category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
+            loss = category_loss+attribute_loss+(offset_loss+0.2*depth_loss+size_loss+2*rotation_loss+0.05*velocity_loss)+dir_loss+centerness_loss
             total_loss+=loss
             
             loss_log[stride] = {

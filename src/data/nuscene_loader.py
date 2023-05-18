@@ -168,6 +168,8 @@ if __name__ == '__main__':
         train_key='train'
         val_key = 'val'
     train_scenes = [item for item in scenes if item['name'] in splits[train_key]]
+    if args.dataset=='v1.1-mini':
+        train_scenes = [item for item in train_scences if item!='scene-0553']
     val_scenes = [item for item in scenes if item['name'] in splits[val_key]]
     for scene in tqdm(train_scenes):
         # print('Hanlding scene %s'%scene['name'])

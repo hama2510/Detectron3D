@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from .fpn import FPN
+from .fpn import FusedFPN
 from collections import OrderedDict
 
 class FCOS3DFused(nn.Module):
     def __init__(self, feature_extractor, num_cate, num_attr):
         super().__init__()
         self.feature_extractor = feature_extractor
-        self.fpn = FPN(self.feature_extractor.channel_num, 256)
+        self.fpn = FusedFPN(self.feature_extractor.channel_num, 256)
         self.cls_head = ClassificationHead(256, num_cate, num_attr, (3,3), 1, 4)
         self.regress_head = RegressionHead(256, (3,3), 1, 4)
 

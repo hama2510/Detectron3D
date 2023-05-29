@@ -147,7 +147,7 @@ class FCOSTransformer():
             stride = 2**int(key[1:])
 #             if not stride in stride_list:
 #                 continue
-            
+            print(key, stride)
             category_map = pred['pred'][key]['category']
             attribute_map = pred['pred'][key]['attribute']
             centerness_map = pred['pred'][key]['centerness']

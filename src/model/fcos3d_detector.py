@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
 import numpy as np
 from .fcos3d import FCOS3D
+from .fcos3d_fused import FCOS3DFused
 from .mobilenet_v2 import MobileNetv2
 from .resnet101 import ResNet101
 from .resnet101_deformable import ResNet101DCN
@@ -44,14 +45,18 @@ class FCOSDetector(nn.Module):
             self.model.eval()
     
     def create_model(self,):
+        if self.config.model.detector_name=='fcos3d':
+            detector = FCOS3D
+        elif self.config.model.detector_name=='fcos3d_fused':
+            detector = FCOS3DFused
         if self.config.model.model_name=='mobilenet':
-            model = FCOS3D(feature_extractor=MobileNetv2(self.config.device, pretrained=True), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
+            model = detector(feature_extractor=MobileNetv2(self.config.device, pretrained=True), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
         # elif 'efficientnet' in self.config.model.model_name:
         #     model = EfficientNet.from_pretrained(self.config.model.model_name, num_classes=self.config.model.num_class)
         elif self.config.model.model_name=='resnet101':
-            model = FCOS3D(feature_extractor=ResNet101(self.config.device, pretrained=True), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
+            model = detector(feature_extractor=ResNet101(self.config.device, pretrained=True), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
         elif self.config.model.model_name=='resnet101_dcn':
-            model = FCOS3D(feature_extractor=ResNet101DCN(), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
+            model = detector(feature_extractor=ResNet101DCN(), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
         else:
             print('Not support model {}'.format(config.model.model_name))
             exit()
@@ -136,9 +141,12 @@ class FCOSTransformer():
         boxes = []
         sample_token = pred['sample_token']
         calib_matrix = pred['calibration_matrix']
+#         stride_list = [32, 64]
         for key in pred['pred'].keys():
 #             stride = int(key)
             stride = 2**int(key[1:])
+#             if not stride in stride_list:
+#                 continue
             
             category_map = pred['pred'][key]['category']
             attribute_map = pred['pred'][key]['attribute']
@@ -149,16 +157,19 @@ class FCOSTransformer():
             rotation_map = pred['pred'][key]['rotation']
             dir_map = pred['pred'][key]['dir']
             velocity_map = pred['pred'][key]['velocity']
-            
             cls_score = np.max(category_map, axis=2)
             pred_score = cls_score*centerness_map[:,:,0]
             indices = np.argwhere(pred_score>det_thres)
-            indices = np.unique(indices, axis=0)
+#             indices = np.unique(indices, axis=0)
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
 #                 y, x = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
-                y = int(idx[0]+offset_map[idx[0], idx[1],0])*stride + np.floor(stride) 
-                x = int(idx[1]+offset_map[idx[0], idx[1],1])*stride + np.floor(stride) 
+                y = int(idx[0]+offset_map[idx[0], idx[1],0])*stride + np.floor(stride)
+                x = int(idx[1]+offset_map[idx[0], idx[1],1])*stride + np.floor(stride)
+                print(x, y)
+                x = int(x/self.config.data.resize)
+                y = int(y/self.config.data.resize)
+                print(x, y)
                 depth = np.exp(depth_map[idx[0]][idx[1],0])
 #                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)
@@ -212,6 +223,6 @@ class FCOSTransformer():
             for item, calib_matrix in data:
                 keep_indices = rotated_nms(item, calib_matrix, nms_thres=self.config.nms_thres)
                 boxes.extend([item[i] for i in keep_indices])
-            print('Running NMS at ', datetime.now()-start)
+            print('Running NMS for {} at '.format(len(boxes)), datetime.now()-start)
         return boxes
     

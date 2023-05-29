@@ -40,30 +40,36 @@ if __name__ == '__main__':
 
     dataset_train = NusceneDataset(config.data.train, config=config)
     dataloader_train = DataLoader(dataset_train, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    dataset_val = NusceneDataset(config.data.val, config=config, return_target=False)
+    dataset_val = NusceneDataset(config.data.val, config=config, return_target=True)
     dataloader_val = DataLoader(dataset_val, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     criterion = Criterion(device=config.device)
     evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
     logger = Logger()
     transformer = FCOSTransformer(config)
 
-    models = []
+    tasks = []
     for model_id, item in enumerate(config.models):
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
         model = FCOSDetector(model_config)
+        model.eval()
         optimizer = optim.Adam(model.parameters(), lr=config.lr)
-        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
+        tasks.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
     
-    for step, samples in enumerate(dataloader_val):
-#         for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
+#     for step, samples in enumerate(dataloader_val):
+    for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
         imgs = samples['img']
         imgs = imgs.to(config.device)
         sample_token = samples['sample_token']
+        targets = samples['target']
         calibration_matrix = samples['calibration_matrix']
-        for model_id in range(0, len(models)):
-            model = models[model_id]['model']
+        for task_id in range(0, len(tasks)):
+            model = tasks[task_id]['model']
             pred = model(imgs)
+#             pred = targets
+#             loss, loss_log = criterion(targets, pred)
+#             print(loss_log)
+#             exit()
 
             for i in range(len(sample_token)):
                 calib_matrix = {}
@@ -74,17 +80,18 @@ if __name__ == '__main__':
                     item['pred'][key]={}
                     for sub_key in pred[key].keys():
                         item['pred'][key][sub_key] = model.item_tensor_to_numpy(sub_key, pred[key][sub_key][i])
-                models[model_id]['pred'].append(item)
+                tasks[task_id]['pred'].append(item)
             del pred
+#         break
     start = datetime.now()
-    for model_id in range(0, len(models)):
-#             model = models[model_id]['model']
-        preds = transformer.transform_predicts(models[model_id]['pred'])
+    for task_id in range(0, len(tasks)):
+#             model = tasks[task_id]['model']
+        preds = transformer.transform_predicts(tasks[task_id]['pred'])
         if len(preds)>0:
-            if models[model_id]['config'].data.dataset_name == 'v1.0-mini':
+            if tasks[task_id]['config'].data.dataset_name == 'v1.0-mini':
                 metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False, clear=False, plot_examples=20,conf_th=config.det_thres)
             else:
-                metrics_summary = evaluation.evaluate(preds, verbose=False)
+                metrics_summary = evaluation.evaluate(preds, verbose=False,  clear=False, plot_examples=20,conf_th=config.det_thres)
             nds = metrics_summary['nd_score']
         else:
             metrics_summary = {}

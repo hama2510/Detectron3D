@@ -84,6 +84,7 @@ if __name__ == '__main__':
                             models[model_id]['loss']['component'][int(stride)][key].append(loss_log[stride][key])
 
                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
+                    del pred
                 loss_str = loss_str[:-1]
                 tepoch.set_postfix(ep=epoch, loss=loss_str)
                 sleep(0.1)
@@ -133,6 +134,8 @@ if __name__ == '__main__':
             
             del metrics_summary
             del models[model_id]['loss']
+            del preds
+            
             models[model_id]['loss'] = logger.init_loss_log()
             
             if config.save_best:

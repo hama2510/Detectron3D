@@ -4,7 +4,7 @@ import numpy as np
 from .fpn import FPN
 from collections import OrderedDict
 
-class FCOS3D(nn.Module):
+class FCOS3DFused(nn.Module):
     def __init__(self, feature_extractor, num_cate, num_attr):
         super().__init__()
         self.feature_extractor = feature_extractor

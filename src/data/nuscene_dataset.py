@@ -15,8 +15,10 @@ import imagesize
 from functools import partial
 from multiprocessing import Pool
 
-STRIDE_LIST = [8, 16, 32, 64, 128]
-M_LIST = [0, 64, 128, 256, 512, np.inf]
+STRIDE_LIST = [16]
+# STRIDE_LIST = [8, 16, 32, 64, 128]
+# M_LIST = [0, 64, 128, 256, 512, np.inf]
+M_LIST = [0, np.inf]
 RADIUS = 1.5
     
 def check_box_and_feature_map_level(point, box, stride, m_list, stride_list):
@@ -44,7 +46,11 @@ def is_positive_location(point, box, stride, radius):
     d = np.sqrt((box_center[0] - point[0])**2 + (box_center[1] - point[1])**2)
     point = [point[0]*stride + np.floor(stride/2), point[1]*stride + np.floor(stride/2)]
     (x1, y1), (x2, y2) = xywh_to_xyxy(box)
-    if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
+#     if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
+#         return True
+#     else:
+#         return False
+    if point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
         return True
     else:
         return False
@@ -108,6 +114,7 @@ class NusceneDataset(Dataset):
         self.m_list = M_LIST
         self.radius = RADIUS
         self.return_target = return_target
+        self.resize = config.data.resize
         
     def __len__(self):
         return len(self.data)
@@ -120,6 +127,7 @@ class NusceneDataset(Dataset):
 #         img = cv.imread(self.image_root+item['image'])
         img = cv.imread(item['image'])
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        img = cv.resize(img, (int(img.shape[1]*self.resize), int(img.shape[0]*self.resize)))
         shape = [img.shape[0], img.shape[1]]
 
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
@@ -129,11 +137,11 @@ class NusceneDataset(Dataset):
                 sample['target']['{}'.format(stride)] = self.gen_target(item['annotations'], shape, stride, item['calibration_matrix'])
         return sample
 
-    def rotation_angle_to_pi_and_bin(self, rotation_angle):
-        rad, bin = rotation_angle/np.pi, np.max([0, int(np.sign(rotation_angle))])
-        dir_cls = np.zeros(2)
-        dir_cls[bin] = 1
-        return rad, dir_cls
+#     def rotation_angle_to_pi_and_bin(self, rotation_angle):
+#         rad, bin = rotation_angle/np.pi, np.max([0, int(np.sign(rotation_angle))])
+#         dir_cls = np.zeros(2)
+#         dir_cls[bin] = 1
+#         return rad, dir_cls
     
     def rotation_angle_to_sin_pi_and_bin(self, rotation_angle):
         rad = np.sin(rotation_angle)
@@ -193,7 +201,7 @@ class NusceneDataset(Dataset):
         if self.transformed:
             for ann in anns:
                 for (x,y) in ann['targets'][stride]:
-                    box_2d = np.asarray(ann['box_2d'], dtype=object)//stride
+                    box_2d = np.asarray(ann['box_2d'], dtype=object)//stride*self.resize
 #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(ann['rotation_angle_rad'])
                     rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(ann['rotation_angle_rad'])
 
@@ -215,7 +223,11 @@ class NusceneDataset(Dataset):
                 for y in range(shape[0]):
                     boxes = []
                     for ann in anns:
-                        if is_positive_location([x, y], ann['box_2d'], stride, self.radius) and is_valid_box(ann['box_2d'], (img_shape[1],img_shape[0])) and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list):
+                        ann['box_2d'] = [np.array([int(ann['box_2d'][0][0]*self.resize), int(ann['box_2d'][0][1]*self.resize)]), int(ann['box_2d'][1]*self.resize), int(ann['box_2d'][2]*self.resize)]
+                        pass_cond = is_positive_location([x, y], ann['box_2d'], stride, self.radius)
+                        pass_cond = pass_cond and is_valid_box(ann['box_2d'], (img_shape[1],img_shape[0]))
+#                         pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
+                        if pass_cond:
                             boxes.append(ann)
                     if len(boxes)>0:
                         # foreground location

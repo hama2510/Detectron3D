@@ -20,13 +20,13 @@ class NpEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
     
 class Evaluation:
-    def __init__(self, dataset_name, dataroot, eval_config, verbose=False):
+    def __init__(self, dataset_name, dataroot, eval_config, verbose=False, output_dir='../tmp/'):
         self.nusc = NuScenes(version=dataset_name, dataroot=dataroot, verbose=verbose)
 #         if 'mini' in dataset_name:
 #             self.eval_set = 'mini_val'
         self.cfg_path = eval_config
-        self.output_dir = '/home/hotta/kiennt/Detectron3D/tmp/'
-        self.result_path = '/home/hotta/kiennt/Detectron3D/tmp/result_tmp.json'
+        self.output_dir = output_dir
+        self.result_path = os.path.join(self.output_dir, 'result_tmp.json')
         
     def dummy_box(self, sample_token):
         return {
@@ -87,7 +87,7 @@ class Evaluation:
         with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:
             json.dump(metrics_summary, f, indent=2)
         
-        metrics_summary = json.load(open('/home/hotta/kiennt/Detectron3D/tmp/metrics_summary.json', 'r'))
+        metrics_summary = json.load(open('../tmp/metrics_summary.json', 'r'))
         if clear:
             self.clear() 
         return metrics_summary

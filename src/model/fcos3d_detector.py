@@ -147,7 +147,6 @@ class FCOSTransformer():
             stride = 2**int(key[1:])
 #             if not stride in stride_list:
 #                 continue
-            print(key, stride)
             category_map = pred['pred'][key]['category']
             attribute_map = pred['pred'][key]['attribute']
             centerness_map = pred['pred'][key]['centerness']
@@ -166,10 +165,8 @@ class FCOSTransformer():
 #                 y, x = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
                 y = int(idx[0]+offset_map[idx[0], idx[1],0])*stride + np.floor(stride)
                 x = int(idx[1]+offset_map[idx[0], idx[1],1])*stride + np.floor(stride)
-                print(x, y)
                 x = int(x/self.config.data.resize)
                 y = int(y/self.config.data.resize)
-                print(x, y)
                 depth = np.exp(depth_map[idx[0]][idx[1],0])
 #                 depth = depth_map[idx[0],idx[1],0]
                 coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)

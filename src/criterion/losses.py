@@ -57,7 +57,6 @@ class Criterion(nn.Module):
 
     def smooth_l1_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
-#         masked = masked.view(masked.shape[0], 1, masked.shape[1])
         if masked is None:
             return nn.SmoothL1Loss()(pred, target)
         else:
@@ -69,7 +68,6 @@ class Criterion(nn.Module):
             
     def l1_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
-#         masked = masked.view(masked.shape[0], 1, masked.shape[1])
         if masked is None:
             return nn.L1Loss()(pred, target)
         else:
@@ -116,12 +114,13 @@ class Criterion(nn.Module):
         return int(np.log2(stride))
 
     def loss(self, pred, target, stride):
+        if not 'p{}'.format(self.stride_to_feat_level(stride)) in pred.keys():
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         pred = pred['p{}'.format(self.stride_to_feat_level(stride))]
         target = target['{}'.format(stride)]
         target = self.to_device(target)
         
         masked = self.gen_mask(target['category'])
-#         print(masked.shape, pred['size'].shape, target['size'].shape)
 
         category_loss = self.focal_loss(pred['category'], target['category'])
         attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)

@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
 import numpy as np
 from .fcos3d import FCOS3D
-from .fcos3d_fused import FCOS3DFused
+from .fcos3d_fused import FCOS3DFused, FCOS3DFusedP3
 from .mobilenet_v2 import MobileNetv2
 from .resnet101 import ResNet101
 from .resnet101_deformable import ResNet101DCN
@@ -49,6 +49,8 @@ class FCOSDetector(nn.Module):
             detector = FCOS3D
         elif self.config.model.detector_name=='fcos3d_fused':
             detector = FCOS3DFused
+        elif self.config.model.detector_name=='fcos3d_fused_p3':
+            detector = FCOS3DFusedP3
         if self.config.model.model_name=='mobilenet':
             model = detector(feature_extractor=MobileNetv2(self.config.device, pretrained=True), num_cate=len(self.meta_data['categories']), num_attr=len(self.meta_data['attributes']))
         # elif 'efficientnet' in self.config.model.model_name:

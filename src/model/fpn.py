@@ -34,3 +34,37 @@ class FusedFPN(nn.Module):
         x2_up = x2_up[:,:,:x['feat1'].shape[2],:]
         outs['p4'] = x['feat1']+x2_up
         return outs
+    
+class FusedFPNP3(nn.Module):
+    def __init__(self, in_channel_list, out_channel):
+        super().__init__()
+        self.fpn = FeaturePyramidNetwork(in_channel_list, out_channel)
+        self.up2 = nn.Upsample(scale_factor=2, mode='nearest')
+        self.up4 = nn.Upsample(scale_factor=4, mode='nearest')
+    
+    def forward(self, x):
+        outs = OrderedDict()
+        x = self.fpn(x)
+        x1_up = self.up2(x['feat1'])
+        x1_up = x1_up[:,:,:x['feat0'].shape[2],:]
+        x2_up = self.up4(x['feat2'])
+        x2_up = x2_up[:,:,:x['feat0'].shape[2],:]
+        outs['p3'] = x['feat0']+x1_up+x2_up
+        return outs
+    
+# class FusedFPNP3(nn.Module):
+#     def __init__(self, in_channel_list, out_channel):
+#         super().__init__()
+#         self.fpn = FeaturePyramidNetwork(in_channel_list, out_channel)
+#         self.up2 = nn.Upsample(scale_factor=2, mode='nearest')
+#         self.up4 = nn.Upsample(scale_factor=4, mode='nearest')
+    
+#     def forward(self, x):
+#         outs = OrderedDict()
+#         x = self.fpn(x)
+#         x1_up = self.up2(x['feat2'])
+#         x1_up = x1_up[:,:,:x['feat0'].shape[2],:]
+#         x2_up = self.up4(x['feat2'])
+#         x2_up = x2_up[:,:,:x['feat0'].shape[2],:]
+#         outs['p3'] = x['feat0']+x1_up++x2_up
+#         return outs

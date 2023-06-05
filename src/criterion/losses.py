@@ -27,7 +27,8 @@ class Criterion(nn.Module):
         target = torch.moveaxis(target, -1, 1)
         target = target.view(target.shape[0], target.shape[1], target.shape[2]*target.shape[3])
         masked = target.sum(axis=1)
-        return masked.view(masked.shape[0], 1, masked.shape[1])
+#         return masked.view(masked.shape[0], 1, masked.shape[1])
+        return masked
         
     def focal_loss(self, pred, target):
         pred, target = self.flattern(pred, target)
@@ -56,6 +57,7 @@ class Criterion(nn.Module):
 
     def smooth_l1_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
+#         masked = masked.view(masked.shape[0], 1, masked.shape[1])
         if masked is None:
             return nn.SmoothL1Loss()(pred, target)
         else:
@@ -67,6 +69,7 @@ class Criterion(nn.Module):
             
     def l1_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
+#         masked = masked.view(masked.shape[0], 1, masked.shape[1])
         if masked is None:
             return nn.L1Loss()(pred, target)
         else:
@@ -86,7 +89,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return (nn.BCELoss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
+                return (nn.BCELoss(reduction='none')(pred, target)*masked).sum()/num_pos
 
 #     def kl_loss(self, pred, target):
 #         pred, target = self.flattern(pred, target)
@@ -107,7 +110,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).mean(axis=1).sum()/num_pos
+                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum()/num_pos
 
     def stride_to_feat_level(self, stride):
         return int(np.log2(stride))
@@ -118,6 +121,7 @@ class Criterion(nn.Module):
         target = self.to_device(target)
         
         masked = self.gen_mask(target['category'])
+#         print(masked.shape, pred['size'].shape, target['size'].shape)
 
         category_loss = self.focal_loss(pred['category'], target['category'])
         attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)

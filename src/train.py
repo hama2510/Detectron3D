@@ -77,7 +77,7 @@ if __name__ == '__main__':
                     loss, loss_log = criterion(targets, pred)
                     loss.backward()
                     optimizer.step()
-
+                    
                     models[model_id]['loss']['total'].append(loss.cpu().detach().numpy())
                     for stride in loss_log.keys():
                         for key in loss_log[stride].keys():

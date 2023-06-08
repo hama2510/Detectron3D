@@ -87,7 +87,7 @@ class Evaluation:
         with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:
             json.dump(metrics_summary, f, indent=2)
         
-        metrics_summary = json.load(open('../tmp/metrics_summary.json', 'r'))
+        metrics_summary = json.load(open(os.path.join(self.output_dir, 'metrics_summary.json'), 'r'))
         if clear:
             self.clear() 
         return metrics_summary

@@ -43,7 +43,6 @@ if __name__ == '__main__':
     dataset_val = NusceneDataset(config.data.val, config=config, return_target=True)
     dataloader_val = DataLoader(dataset_val, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     criterion = Criterion(device=config.device)
-    evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
     logger = Logger()
     transformer = FCOSTransformer(config)
 
@@ -87,6 +86,7 @@ if __name__ == '__main__':
     for task_id in range(0, len(tasks)):
 #             model = tasks[task_id]['model']
         preds = transformer.transform_predicts(tasks[task_id]['pred'])
+        evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path, output_dir=tasks[task_id]['config'].model.save_dir)
         if len(preds)>0:
             if tasks[task_id]['config'].data.dataset_name == 'v1.0-mini':
                 metrics_summary = evaluation.evaluate(preds, eval_set='mini_val', verbose=False, clear=False, plot_examples=20,conf_th=config.det_thres)

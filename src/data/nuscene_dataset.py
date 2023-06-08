@@ -162,6 +162,7 @@ class NusceneDataset(Dataset):
         self.radius = RADIUS
         self.return_target = return_target
         self.resize = config.data.resize
+        self.rotation_encode = config.data.rotation_encode
 
     def __len__(self):
         return len(self.data)
@@ -174,18 +175,18 @@ class NusceneDataset(Dataset):
         #         img = cv.imread(self.image_root+item['image'])
         img = cv.imread(item["image"])
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-        # print(img.shape)
         img = cv.resize(
             img, (int(img.shape[1] * self.resize), int(img.shape[0] * self.resize))
         )
         shape = [img.shape[0], img.shape[1]]
-
+        raw_img = img.copy()
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
         sample = {
             "sample_token": item["sample_token"],
             "calibration_matrix": item["calibration_matrix"],
             "img_path": item["image"],
             "img": img,
+            "raw_img": raw_img,
             "target": {},
         }
         if self.return_target:
@@ -238,9 +239,8 @@ class NusceneDataset(Dataset):
             return [velocity[0], velocity[1]]
 
     def centerness(self, point, box, alpha=2.5):
-        return np.exp(
-            -alpha * ((point[0] - box[0][0]) ** 2 + (point[1] - box[0][1]) ** 2)
-        )
+        c = np.exp(-alpha * ((point[0] - box[0][0]) ** 2 + (point[1] - box[0][1]) ** 2))
+        return c
 
     def offset(self, point, box):
         return [box[0][0] - point[0], box[0][1] - point[1]]
@@ -272,10 +272,15 @@ class NusceneDataset(Dataset):
                     box_2d = (
                         np.asarray(ann["box_2d"], dtype=object) // stride * self.resize
                     )
-                    #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(ann['rotation_angle_rad'])
-                    rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                        ann["rotation_angle_rad"]
-                    )
+                    if self.rotation_encode == "sin_pi_and_bin":
+                        rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
+                            ann["rotation_angle_rad"]
+                        )
+                    elif self.rotation_encode == "pi_and_minus_pi":
+                        rad = self.rotation_angle_to_pi_and_minus_pi(
+                            ann["rotation_angle_rad"]
+                        )
+                        dir_cls = 0
 
                     category_onehot = self.gen_category_onehot(ann["category"])
                     if category_onehot is None:
@@ -316,7 +321,7 @@ class NusceneDataset(Dataset):
                         #                         pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
-                            new_ann['box_2d'] = box_2d
+                            new_ann["box_2d"] = box_2d
                             boxes.append(new_ann)
                     if len(boxes) > 0:
                         # foreground location

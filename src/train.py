@@ -139,7 +139,7 @@ if __name__ == '__main__':
             models[model_id]['loss'] = logger.init_loss_log()
             
             if config.save_best:
-                if nds>=models[model_id]['best_score']:
+                if nds>models[model_id]['best_score']:
                     model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             else:
                 model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))

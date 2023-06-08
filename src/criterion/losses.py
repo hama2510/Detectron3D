@@ -121,6 +121,7 @@ class Criterion(nn.Module):
         target = self.to_device(target)
         
         masked = self.gen_mask(target['category'])
+#         print(masked.sum())
 
         category_loss = self.focal_loss(pred['category'], target['category'])
         attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)

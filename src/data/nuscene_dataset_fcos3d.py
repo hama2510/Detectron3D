@@ -17,10 +17,10 @@ import imagesize
 from functools import partial
 from multiprocessing import Pool
 
-STRIDE_LIST = [8]
-# STRIDE_LIST = [8, 16, 32, 64, 128]
-# M_LIST = [0, 64, 128, 256, 512, np.inf]
-M_LIST = [0, np.inf]
+# STRIDE_LIST = [8]
+STRIDE_LIST = [8, 16, 32, 64, 128]
+M_LIST = [0, 64, 128, 256, 512, np.inf]
+# M_LIST = [0, np.inf]
 RADIUS = 1.5
 
 
@@ -69,87 +69,16 @@ def is_positive_location(point, box, stride, radius):
         point[1] * stride + np.floor(stride / 2),
     ]
     (x1, y1), (x2, y2) = xywh_to_xyxy(box)
-    #     if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
-    #         return True
-    #     else:
-    #         return False
+    if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
+        return True
+    else:
+        return False
     if point[0] > x1 and point[0] < x2 and point[1] > y1 and point[1] < y2:
         return True
     else:
         return False
 
-
-class NusceneDatasetTransform:
-    def __init__(self, num_worker):
-        self.stride_list = STRIDE_LIST
-        self.m_list = M_LIST
-        self.radius = RADIUS
-        self.num_worker = num_worker
-
-    def update_annotation(self, item):
-        shape = imagesize.get(item["image"])
-        calib_matrix = item["calibration_matrix"]
-        anns = item["annotations"]
-        for stride in self.stride_list:
-            new_shape = [
-                int(np.ceil(shape[0] / stride)),
-                int(np.ceil(shape[1] / stride)),
-            ]
-            for ann in item["annotations"]:
-                if not "targets" in ann.keys():
-                    ann["targets"] = {}
-                ann["targets"][stride] = []
-            for x in range(new_shape[0]):
-                for y in range(new_shape[1]):
-                    boxes = []
-                    for idx, ann in enumerate(anns):
-                        if (
-                            is_valid_box(ann["box_2d"], shape)
-                            and is_positive_location(
-                                [x, y], ann["box_2d"], stride, self.radius
-                            )
-                            and check_box_and_feature_map_level(
-                                [x, y],
-                                ann["box_2d"],
-                                stride,
-                                self.m_list,
-                                self.stride_list,
-                            )
-                        ):
-                            boxes.append([idx, ann])
-                    if len(boxes) > 0:
-                        boxes.sort(
-                            key=lambda item: distance_to_center(
-                                [
-                                    x * stride + np.floor(stride / 2),
-                                    y * stride + np.floor(stride / 2),
-                                ],
-                                item[1]["box_2d"],
-                            )
-                        )
-                        idx = boxes[0][0]
-                        item["annotations"][idx]["targets"][stride].append([x, y])
-        return item
-
-    def transform(self, data, out):
-        data = pickle.load(open(data, "rb"))
-        #         data = data[:10]
-
-        if self.num_worker > 0:
-            pool = Pool(self.num_worker)
-            r = list(tqdm(pool.imap(self.update_annotation, data), total=len(data)))
-            pool.close()
-            pool.join()
-        else:
-            for item in tqdm(data):
-                item["annotation"] = self.update_annotation(item)
-            r = data
-
-        os.makedirs(os.path.dirname(out), exist_ok=True)
-        pickle.dump(r, open(out, "wb"))
-
-
-class NusceneDataset(Dataset):
+class NusceneDatasetFCOS3D(Dataset):
     def __init__(self, data_file, config, return_target=True):
         self.transformed = config.data.transformed
         self.image_root = config.data.image_root
@@ -162,7 +91,6 @@ class NusceneDataset(Dataset):
         self.radius = RADIUS
         self.return_target = return_target
         self.resize = config.data.resize
-        self.rotation_encode = config.data.rotation_encode
 
     def __len__(self):
         return len(self.data)
@@ -175,18 +103,18 @@ class NusceneDataset(Dataset):
         #         img = cv.imread(self.image_root+item['image'])
         img = cv.imread(item["image"])
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        # print(img.shape)
         img = cv.resize(
             img, (int(img.shape[1] * self.resize), int(img.shape[0] * self.resize))
         )
         shape = [img.shape[0], img.shape[1]]
-        raw_img = img.copy()
+
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
         sample = {
             "sample_token": item["sample_token"],
             "calibration_matrix": item["calibration_matrix"],
             "img_path": item["image"],
             "img": img,
-            "raw_img": raw_img,
             "target": {},
         }
         if self.return_target:
@@ -239,8 +167,9 @@ class NusceneDataset(Dataset):
             return [velocity[0], velocity[1]]
 
     def centerness(self, point, box, alpha=2.5):
-        c = np.exp(-alpha * ((point[0] - box[0][0]) ** 2 + (point[1] - box[0][1]) ** 2))
-        return c
+        return np.exp(
+            -alpha * ((point[0] - box[0][0]) ** 2 + (point[1] - box[0][1]) ** 2)
+        )
 
     def offset(self, point, box):
         return [box[0][0] - point[0], box[0][1] - point[1]]
@@ -272,15 +201,10 @@ class NusceneDataset(Dataset):
                     box_2d = (
                         np.asarray(ann["box_2d"], dtype=object) // stride * self.resize
                     )
-                    if self.rotation_encode == "sin_pi_and_bin":
-                        rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                            ann["rotation_angle_rad"]
-                        )
-                    elif self.rotation_encode == "pi_and_minus_pi":
-                        rad = self.rotation_angle_to_pi_and_minus_pi(
-                            ann["rotation_angle_rad"]
-                        )
-                        dir_cls = 0
+                    #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(ann['rotation_angle_rad'])
+                    rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
+                        ann["rotation_angle_rad"]
+                    )
 
                     category_onehot = self.gen_category_onehot(ann["category"])
                     if category_onehot is None:
@@ -318,10 +242,10 @@ class NusceneDataset(Dataset):
                         pass_cond = pass_cond and is_valid_box(
                             box_2d, (img_shape[1], img_shape[0])
                         )
-                        #                         pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
+                        pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
-                            new_ann["box_2d"] = box_2d
+                            new_ann['box_2d'] = box_2d
                             boxes.append(new_ann)
                     if len(boxes) > 0:
                         # foreground location

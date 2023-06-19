@@ -284,10 +284,11 @@ class FCOSTransformer:
             pool.join()
             print("Transforming prediction at ", datetime.now() - start)
             start = datetime.now()
+            total_box = sum([len(item) for item, calib_matrix in data])
             for item, calib_matrix in data:
                 keep_indices = rotated_nms(
                     item, calib_matrix, nms_thres=self.config.nms_thres
                 )
                 boxes.extend([item[i] for i in keep_indices])
-            print("Running NMS for {} at ".format(len(boxes)), datetime.now() - start)
+            print("Running NMS from {} to {} at ".format(total_box, len(boxes)), datetime.now() - start)
         return boxes

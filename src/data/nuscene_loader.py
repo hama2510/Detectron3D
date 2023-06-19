@@ -71,6 +71,8 @@ class NuScenesLoader:
             if not data_path in data.keys():
                 data[data_path]={'anns':[], 'calibration_matrix':self.read_sensor(sample_data_token)}
             for box in boxes:
+#                 print(box.orientation)
+#                 print(box.orientation.radians)
                 ann= dict({
                     'category': box.name,
                     'xyz_in_meter': ann_metadata['translation'],
@@ -149,7 +151,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--dataset', type=str, help='datset name')
     parser.add_argument('--dataroot', type=str, help='datset root')
-    parser.add_argument('--num_worker', type=int, default=4)
+    parser.add_argument('--num_worker', type=int, default=16)
     parser.add_argument('--out', type=str, help='out file folder')
     args = parser.parse_args()
 
@@ -167,10 +169,12 @@ if __name__ == '__main__':
     else:
         train_key='train'
         val_key = 'val'
+        
     train_scenes = [item for item in scenes if item['name'] in splits[train_key]]
     if args.dataset=='v1.1-mini':
         train_scenes = [item for item in train_scences if item!='scene-0553']
     val_scenes = [item for item in scenes if item['name'] in splits[val_key]]
+    
     for scene in tqdm(train_scenes):
         # print('Hanlding scene %s'%scene['name'])
         train_data.extend(nusc.get_samples_from_scene(scene))
@@ -185,5 +189,5 @@ if __name__ == '__main__':
             'category_map': CATEGORY_MAP, 
             'attributes': attributes}
     pickle.dump(meta, open(os.path.join(args.out, 'meta.pkl'), 'wb'))
-    pickle.dump(val_data, open(os.path.join(args.out, 'train.pkl'), 'wb'))
+    pickle.dump(train_data, open(os.path.join(args.out, 'train.pkl'), 'wb'))
     pickle.dump(val_data, open(os.path.join(args.out, 'val.pkl'), 'wb'))

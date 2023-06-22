@@ -62,31 +62,30 @@ class NuScenesLoader:
                 data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample['data'][cam],
                                                                           selected_anntokens=[ann_token])
                 if len(boxes) > 0:
-                    break
-            sample_data_token = sample['data'][cam]
-            data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample_data_token, selected_anntokens=[ann_token])
-            ann_metadata =  self.nusc.get('sample_annotation', ann_token)
-            assert len(ann_metadata['attribute_tokens'])<=1
+                    sample_data_token = sample['data'][cam]
+                    # data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample_data_token, selected_anntokens=[ann_token])
+                    ann_metadata =  self.nusc.get('sample_annotation', ann_token)
+                    assert len(ann_metadata['attribute_tokens'])<=1
 
-            if not data_path in data.keys():
-                data[data_path]={'anns':[], 'calibration_matrix':self.read_sensor(sample_data_token)}
-            for box in boxes:
-#                 print(box.orientation)
-#                 print(box.orientation.radians)
-                ann= dict({
-                    'category': box.name,
-                    'xyz_in_meter': ann_metadata['translation'],
-                    'box_size': ann_metadata['size'],
-                    'xyz_in_sensor_coor': box.center,
-                    # using calibrated coord
-                    'box_2d': box_3d_to_2d(box, data[data_path]['calibration_matrix']),
-                    'rotation_angle_degree': box.orientation.degrees,
-                    'rotation_angle_rad': box.orientation.radians,
-                    'velocity': self.nusc.box_velocity(ann_token),
-                    'attribute': self.read_attribute(ann_metadata['attribute_tokens']),
-                    'visibility': self.read_visibility(ann_metadata['visibility_token'])
-                })
-                data[data_path]['anns'].append(ann)
+                    if not data_path in data.keys():
+                        data[data_path]={'anns':[], 'calibration_matrix':self.read_sensor(sample_data_token)}
+                    for box in boxes:
+        #                 print(box.orientation)
+        #                 print(box.orientation.radians)
+                        ann= dict({
+                            'category': box.name,
+                            'xyz_in_meter': ann_metadata['translation'],
+                            'box_size': ann_metadata['size'],
+                            'xyz_in_sensor_coor': box.center,
+                            # using calibrated coord
+                            'box_2d': box_3d_to_2d(box, data[data_path]['calibration_matrix']),
+                            'rotation_angle_degree': box.orientation.degrees,
+                            'rotation_angle_rad': box.orientation.radians,
+                            'velocity': self.nusc.box_velocity(ann_token),
+                            'attribute': self.read_attribute(ann_metadata['attribute_tokens']),
+                            'visibility': self.read_visibility(ann_metadata['visibility_token'])
+                        })
+                        data[data_path]['anns'].append(ann)
         data = [{'scene':sample['scene_token'], 'sample_token': sample['token'], 'image':os.path.abspath(key), 'calibration_matrix':data[key]['calibration_matrix'], 
                  'annotations':data[key]['anns'], } for key in data.keys()]
         return data

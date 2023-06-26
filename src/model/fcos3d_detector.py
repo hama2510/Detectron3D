@@ -125,7 +125,7 @@ class FCOSDetector(nn.Module):
         for key in pred["pred"].keys():
             output["pred"][key] = {}
             category_map = (
-                torch.clamp(pred["pred"][key]["category"], min=0, max=1)
+                torch.clamp(pred["pred"][key]["category"], min=0)
                 .detach()
                 .cpu()
                 .numpy()
@@ -200,16 +200,15 @@ class FCOSTransformer:
             cls_score = np.max(category_map, axis=2)
             pred_score = cls_score * centerness_map[:, :, 0]
             indices = np.argwhere(pred_score > det_thres)
-            #             indices = np.unique(indices, axis=0)
+            # indices = np.unique(indices, axis=0)
+ 
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
                 #                 y, x = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
-                y = int(idx[0] + offset_map[idx[0], idx[1], 0]) * stride + np.floor(
-                    stride
-                )
-                x = int(idx[1] + offset_map[idx[0], idx[1], 1]) * stride + np.floor(
-                    stride
-                )
+                # y = int(idx[0] + offset_map[idx[0], idx[1], 1]) * stride 
+                # x = int(idx[1] + offset_map[idx[0], idx[1], 0]) * stride 
+                y = int(idx[0] * stride + offset_map[idx[0], idx[1], 1])
+                x = int(idx[1] * stride + offset_map[idx[0], idx[1], 0])
                 x = int(x / self.config.data.resize)
                 y = int(y / self.config.data.resize)
                 depth = np.exp(depth_map[idx[0]][idx[1], 0])
@@ -256,8 +255,6 @@ class FCOSTransformer:
                         "attribute_name": attribute,
                     }
                 )
-        #         keep_indices = rotated_nms(boxes, calib_matrix, nms_thres=nms_thres)
-        #         boxes = [boxes[i] for i in keep_indices]
         return boxes, calib_matrix
 
     def transform_predicts(self, preds):

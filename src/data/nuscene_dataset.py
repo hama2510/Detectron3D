@@ -17,7 +17,7 @@ import imagesize
 from functools import partial
 from multiprocessing import Pool
 
-STRIDE_LIST = [8]
+STRIDE_LIST = [16]
 # STRIDE_LIST = [8, 16, 32, 64, 128]
 # M_LIST = [0, 64, 128, 256, 512, np.inf]
 M_LIST = [0, np.inf]
@@ -186,7 +186,7 @@ class NusceneDataset(Dataset):
             "calibration_matrix": item["calibration_matrix"],
             "img_path": item["image"],
             "img": img,
-            "raw_img": raw_img,
+            # "raw_img": raw_img,
             "target": {},
         }
         if self.return_target:
@@ -242,10 +242,10 @@ class NusceneDataset(Dataset):
         c = np.exp(-alpha * ((point[0] - box[0][0]) ** 2 + (point[1] - box[0][1]) ** 2))
         return c
 
-    def offset(self, point, box):
-        return [box[0][0] - point[0], box[0][1] - point[1]]
+    def offset(self, point, box, stride):
+        # return [box[0][0] - point[0], box[0][1] - point[1]]
 
-    #         return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
+        return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
 
     def gen_target(self, anns, img_shape, stride, calib_matrix):
         shape = [
@@ -267,36 +267,37 @@ class NusceneDataset(Dataset):
         velocity_target = np.zeros((shape[0], shape[1], 2))
 
         if self.transformed:
-            for ann in anns:
-                for x, y in ann["targets"][stride]:
-                    box_2d = (
-                        np.asarray(ann["box_2d"], dtype=object) // stride * self.resize
-                    )
-                    if self.rotation_encode == "sin_pi_and_bin":
-                        rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                            ann["rotation_angle_rad"]
-                        )
-                    elif self.rotation_encode == "pi_and_minus_pi":
-                        rad = self.rotation_angle_to_pi_and_minus_pi(
-                            ann["rotation_angle_rad"]
-                        )
-                        dir_cls = 0
+            pass
+            # for ann in anns:
+            #     for x, y in ann["targets"][stride]:
+            #         box_2d = (
+            #             np.asarray(ann["box_2d"], dtype=object) // stride * self.resize
+            #         )
+            #         if self.rotation_encode == "sin_pi_and_bin":
+            #             rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
+            #                 ann["rotation_angle_rad"]
+            #             )
+            #         elif self.rotation_encode == "pi_and_minus_pi":
+            #             rad = self.rotation_angle_to_pi_and_minus_pi(
+            #                 ann["rotation_angle_rad"]
+            #             )
+            #             dir_cls = 0
 
-                    category_onehot = self.gen_category_onehot(ann["category"])
-                    if category_onehot is None:
-                        # skip void objects
-                        continue
-                    category_target[y, x, :] = category_onehot
-                    attribute_target[y, x, :] = self.gen_attribute_onehot(
-                        ann["attribute"]
-                    )
-                    centerness_target[y, x, :] = self.centerness([x, y], box_2d)
-                    offset_target[y, x, :] = self.offset([x, y], box_2d)
-                    depth_target[y, x, :] = ann["xyz_in_sensor_coor"][2]
-                    size_target[y, x, :] = ann["box_size"]
-                    rotation_target[y, x, :] = rad
-                    dir_target[y, x, :] = dir_cls
-                    velocity_target[y, x, :] = self.gen_velocity(ann["velocity"])
+            #         category_onehot = self.gen_category_onehot(ann["category"])
+            #         if category_onehot is None:
+            #             # skip void objects
+            #             continue
+            #         category_target[y, x, :] = category_onehot
+            #         attribute_target[y, x, :] = self.gen_attribute_onehot(
+            #             ann["attribute"]
+            #         )
+            #         centerness_target[y, x, :] = self.centerness([x, y], box_2d)
+            #         offset_target[y, x, :] = self.offset([x, y], box_2d)
+            #         depth_target[y, x, :] = ann["xyz_in_sensor_coor"][2]
+            #         size_target[y, x, :] = ann["box_size"]
+            #         rotation_target[y, x, :] = rad
+            #         dir_target[y, x, :] = dir_cls
+            #         velocity_target[y, x, :] = self.gen_velocity(ann["velocity"])
         else:
             for x in range(shape[1]):
                 for y in range(shape[0]):
@@ -315,9 +316,9 @@ class NusceneDataset(Dataset):
                         pass_cond = is_positive_location(
                             [x, y], box_2d, stride, self.radius
                         )
-                        pass_cond = pass_cond and is_valid_box(
-                            box_2d, (img_shape[1], img_shape[0])
-                        )
+                        # pass_cond = pass_cond and is_valid_box(
+                        #     box_2d, (img_shape[1], img_shape[0])
+                        # )
                         #                         pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
@@ -351,7 +352,7 @@ class NusceneDataset(Dataset):
                             box["attribute"]
                         )
                         centerness_target[y, x, :] = self.centerness([x, y], box_2d)
-                        offset_target[y, x, :] = self.offset([x, y], box_2d)
+                        offset_target[y, x, :] = self.offset([x, y], box["box_2d"], stride)
                         depth_target[y, x, :] = box["xyz_in_sensor_coor"][2]
                         size_target[y, x, :] = box["box_size"]
                         rotation_target[y, x, :] = rad

@@ -65,10 +65,6 @@ if __name__ == '__main__':
         for task_id in range(0, len(tasks)):
             model = tasks[task_id]['model']
             pred = model(imgs)
-#             pred = targets
-#             loss, loss_log = criterion(targets, pred)
-#             print(loss_log)
-#             exit()
 
             for i in range(len(sample_token)):
                 calib_matrix = {}

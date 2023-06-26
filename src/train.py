@@ -62,6 +62,8 @@ if __name__ == '__main__':
         # train
         print('Training ...')
 #         for step, samples in enumerate(dataloader_train):
+        for model_id in range(0, len(models)):
+            models[model_id]['model'].train()
         with tqdm(dataloader_train, desc="Train") as tepoch:
             for step, samples in enumerate(tepoch):
                 loss_str = ''
@@ -93,6 +95,8 @@ if __name__ == '__main__':
 #         # valid
         print('Validating ...')
 #         for step, samples in enumerate(dataloader_val):
+        for model_id in range(0, len(models)):
+            models[model_id]['model'].eval()
         for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
             imgs = samples['img']
             imgs = imgs.to(config.device)

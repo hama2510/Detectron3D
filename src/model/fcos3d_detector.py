@@ -288,4 +288,7 @@ class FCOSTransformer:
                 )
                 boxes.extend([item[i] for i in keep_indices])
             print("Running NMS from {} to {} at ".format(total_box, len(boxes)), datetime.now() - start)
+            if len(boxes)>10000:
+                boxes.sort(key=lambda x: x['detection_score'])
+                boxes = boxes[:10000]
         return boxes

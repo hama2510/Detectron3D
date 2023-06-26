@@ -78,7 +78,7 @@ class FCOSDetector(nn.Module):
                 num_attr=len(self.meta_data["attributes"]),
             )
         else:
-            print("Not support model {}".format(config.model.model_name))
+            print("Not support model {}".format(self.config.model.model_name))
             exit()
         model.to(self.config["device"])
         return model

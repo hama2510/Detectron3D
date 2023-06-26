@@ -337,10 +337,16 @@ class NusceneDataset(Dataset):
                         )
                         box = boxes[0]
                         box_2d = np.asarray(box["box_2d"], dtype=object) // stride
-                        #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['rotation_angle_rad'])
-                        rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                            box["rotation_angle_rad"]
-                        )
+                        if self.rotation_encode == "sin_pi_and_bin":
+                            rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
+                                ann["rotation_angle_rad"]
+                            )
+                        elif self.rotation_encode == "pi_and_minus_pi":
+                            rad = self.rotation_angle_to_pi_and_minus_pi(
+                                ann["rotation_angle_rad"]
+                            )
+                            dir_cls = 0
+                        
 
                         category_onehot = self.gen_category_onehot(box["category"])
                         if category_onehot is None:

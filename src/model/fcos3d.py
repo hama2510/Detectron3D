@@ -51,7 +51,7 @@ class ClassificationHead(nn.Module):
     def forward(self, x):
         x = self.convs(x)
         outs = OrderedDict()
-        outs['category'] = self.relu(self.conv_cate(x))
+        outs['category'] = self.sigmoid(self.conv_cate(x))
         outs['attribute'] = self.conv_attr(x)
         return outs
 

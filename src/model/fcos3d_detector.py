@@ -125,17 +125,19 @@ class FCOSDetector(nn.Module):
         for key in pred["pred"].keys():
             output["pred"][key] = {}
             category_map = (
-                torch.clamp(pred["pred"][key]["category"], min=0)
+                torch.clamp(pred["pred"][key]["category"], min=0, max=1)
                 .detach()
                 .cpu()
                 .numpy()
             )
+
             attribute_map = (
                 nn.functional.softmax(pred["pred"][key]["attribute"], dim=1)
                 .detach()
                 .cpu()
                 .numpy()
             )
+
             #             attribute_map = pred['pred'][key]['attribute'].detach().cpu().numpy()
             centerness_map = pred["pred"][key]["centerness"].detach().cpu().numpy()
             offset_map = pred["pred"][key]["offset"].detach().cpu().numpy()
@@ -198,15 +200,16 @@ class FCOSTransformer:
             dir_map = pred["pred"][key]["dir"]
             velocity_map = pred["pred"][key]["velocity"]
             cls_score = np.max(category_map, axis=2)
+            print(np.max(cls_score), np.min(cls_score))
             pred_score = cls_score * centerness_map[:, :, 0]
             indices = np.argwhere(pred_score > det_thres)
             # indices = np.unique(indices, axis=0)
- 
+
             for idx in indices:
                 sc = pred_score[idx[0], idx[1]]
                 #                 y, x = int(idx[0]*stride+offset_map[idx[0], idx[1],0]), int(idx[1]*stride+offset_map[idx[0], idx[1],1])
-                # y = int(idx[0] + offset_map[idx[0], idx[1], 1]) * stride 
-                # x = int(idx[1] + offset_map[idx[0], idx[1], 0]) * stride 
+                # y = int(idx[0] + offset_map[idx[0], idx[1], 1]) * stride
+                # x = int(idx[1] + offset_map[idx[0], idx[1], 0]) * stride
                 y = int(idx[0] * stride + offset_map[idx[0], idx[1], 1])
                 x = int(idx[1] * stride + offset_map[idx[0], idx[1], 0])
                 x = int(x / self.config.data.resize)
@@ -287,8 +290,11 @@ class FCOSTransformer:
                     item, calib_matrix, nms_thres=self.config.nms_thres
                 )
                 boxes.extend([item[i] for i in keep_indices])
-            print("Running NMS from {} to {} at ".format(total_box, len(boxes)), datetime.now() - start)
-            if len(boxes)>10000:
-                boxes.sort(key=lambda x: x['detection_score'])
+            print(
+                "Running NMS from {} to {} at ".format(total_box, len(boxes)),
+                datetime.now() - start,
+            )
+            if len(boxes) > 10000:
+                boxes.sort(key=lambda x: x["detection_score"])
                 boxes = boxes[:10000]
         return boxes

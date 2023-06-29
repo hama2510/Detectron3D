@@ -200,7 +200,6 @@ class FCOSTransformer:
             dir_map = pred["pred"][key]["dir"]
             velocity_map = pred["pred"][key]["velocity"]
             cls_score = np.max(category_map, axis=2)
-            print(np.max(cls_score), np.min(cls_score))
             pred_score = cls_score * centerness_map[:, :, 0]
             indices = np.argwhere(pred_score > det_thres)
             # indices = np.unique(indices, axis=0)

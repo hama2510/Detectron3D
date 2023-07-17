@@ -10,6 +10,7 @@ from .resnet101_deformable import ResNet101DCN
 import pickle
 from pyquaternion import Quaternion
 import sys, os
+import scipy
 
 sys.path.append("..")
 from utils.nms import rotated_nms
@@ -180,7 +181,7 @@ class FCOSTransformer:
         self.config = config
         self.meta_data = pickle.load(open(config.data.meta_data, "rb"))
 
-    def transform_predict(self, pred, det_thres=0.05, nms_thres=0.3):
+    def transform_predict(self, pred, det_thres=0.05):
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]
@@ -241,16 +242,16 @@ class FCOSTransformer:
                     ]
                     if attribute == "void":
                         attribute = ""
-
+                box_real = sensor_coord_to_real_coord(
+                    coord_3d, size, rotation_q, calib_matrix
+                )
                 boxes.append(
                     {
                         "sample_token": sample_token,
-                        "translation": sensor_coord_to_real_coord(
-                            coord_3d, size, rotation_q, calib_matrix
-                        ),
-                        "size": size,
-                        "rotation": rotation_q.elements,
-                        "rotation_angle": rotation,
+                        "translation": box_real.center,
+                        "size": box_real.wlh,
+                        "rotation": box_real.orientation.elements,
+                        "rotation_angle": box_real.orientation.angle,
                         "velocity": velocity,
                         "detection_name": category,
                         "detection_score": sc,
@@ -259,7 +260,79 @@ class FCOSTransformer:
                 )
         return boxes, calib_matrix
 
-    def transform_predicts(self, preds):
+    def transform_target(self, pred, det_thres=0.05):
+        boxes = []
+        sample_token = pred["sample_token"]
+        calib_matrix = pred["calibration_matrix"]
+        for key in pred["pred"].keys():
+            stride = int(key)
+            category_map = pred["pred"][key]["category"]
+            attribute_map = scipy.special.softmax(
+                pred["pred"][key]["attribute"], axis=2
+            )
+            centerness_map = pred["pred"][key]["centerness"]
+            offset_map = pred["pred"][key]["offset"]
+            depth_map = pred["pred"][key]["depth"]
+            size_map = pred["pred"][key]["size"]
+            rotation_map = pred["pred"][key]["rotation"]
+            dir_map = scipy.special.softmax(pred["pred"][key]["dir"], axis=2)
+            velocity_map = pred["pred"][key]["velocity"]
+            cls_score = np.max(category_map, axis=2)
+            pred_score = cls_score * centerness_map[:, :, 0]
+            indices = np.argwhere(pred_score > det_thres)
+
+            for idx in indices:
+                sc = pred_score[idx[0], idx[1]]
+                y = int(idx[0] * stride + offset_map[idx[0], idx[1], 1])
+                x = int(idx[1] * stride + offset_map[idx[0], idx[1], 0])
+                x = int(x / self.config.data.resize)
+                y = int(y / self.config.data.resize)
+                depth = depth_map[idx[0]][idx[1], 0]
+                coord_3d = coord_2d_to_3d([x, y], depth, calib_matrix)
+                size = np.clip(size_map[idx[0], idx[1], :], a_min=1e-4, a_max=None)
+
+                if self.config.data.rotation_encode == "pi_and_minus_pi":
+                    rotation = rotation_map[idx[0], idx[1], 0] * np.pi * 2.0
+                elif self.config.data.rotation_encode == "sin_pi_and_bin":
+                    rotation = np.arcsin(rotation_map[idx[0], idx[1], 0])
+                    dir = np.argmax(dir_map[idx[0], idx[1], :])
+                    if dir == 0:
+                        if rotation > 0:
+                            rotation += np.pi / 2
+                        else:
+                            rotation -= np.pi / 2
+                rotation_q = Quaternion(axis=[0, 0, 1], angle=rotation)
+                velocity = velocity_map[idx[0], idx[1], :]
+                category = self.meta_data["categories"][
+                    np.argmax(category_map[idx[0], idx[1], :])
+                ]
+                if category in ["barrier", "traffic_cone"]:
+                    attribute = ""
+                else:
+                    attribute = self.meta_data["attributes"][
+                        np.argmax(attribute_map[idx[0], idx[1], :])
+                    ]
+                    if attribute == "void":
+                        attribute = ""
+                box_real = sensor_coord_to_real_coord(
+                    coord_3d, size, rotation_q, calib_matrix
+                )
+                boxes.append(
+                    {
+                        "sample_token": sample_token,
+                        "translation": box_real.center,
+                        "size": box_real.wlh,
+                        "rotation": box_real.orientation.elements,
+                        "rotation_angle": box_real.orientation.angle,
+                        "velocity": velocity,
+                        "detection_name": category,
+                        "detection_score": sc,
+                        "attribute_name": attribute,
+                    }
+                )
+        return boxes, calib_matrix
+
+    def transform_predicts(self, preds, target=False):
         boxes = []
         if self.config.num_workers <= 1:
             for pred in preds:
@@ -267,15 +340,15 @@ class FCOSTransformer:
                     self.transform_predict(pred, det_thres=self.config.det_thres)
                 )
         else:
+            if not target:
+                func = self.transform_predict
+            else:
+                func = self.transform_target
             start = datetime.now()
             pool = Pool(self.config.num_workers)
             data = list(
                 pool.imap(
-                    partial(
-                        self.transform_predict,
-                        det_thres=self.config.det_thres,
-                        nms_thres=self.config.nms_thres,
-                    ),
+                    partial(func, det_thres=self.config.det_thres),
                     preds,
                 )
             )
@@ -283,8 +356,9 @@ class FCOSTransformer:
             pool.join()
             print("Transforming prediction at ", datetime.now() - start)
             start = datetime.now()
-            total_box = sum([len(item) for item, calib_matrix in data])
+            total_box = sum([len(item) for item, _ in data])
             for item, calib_matrix in data:
+                # keep_indices = list(range(len(item)))
                 keep_indices = rotated_nms(
                     item, calib_matrix, nms_thres=self.config.nms_thres
                 )

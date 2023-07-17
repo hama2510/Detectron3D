@@ -5,6 +5,7 @@ from pyquaternion import Quaternion
 import numpy as np
 from nuscenes.utils.geometry_utils import view_points
 from nuscenes.utils.data_classes import Box
+from nuscenes.eval.common.utils import angle_diff, quaternion_yaw
 
 def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=True):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = np.array(intrinsic), np.array(sensor_R), np.array(sensor_t), np.array(ego_R), np.array(ego_t)
@@ -78,11 +79,29 @@ def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
     coord_3d = coord_3d[:3].T
     return coord_3d
 
+
+# def rotate_box(box, quaternion):
+#     q = Quaternion(axis=[0,0,1], angle=quaternion_yaw(quaternion))
+#     box.center = np.dot(quaternion.rotation_matrix, box.center)
+#     box.orientation = q * box.orientation
+#     box.velocity = np.dot(quaternion.rotation_matrix, box.velocity)
+#     return box 
+
 def sensor_coord_to_real_coord(coord, size, rotation, calibration_matrix):
     sensor_R_quaternion, sensor_t, ego_R_quaternion, ego_t = calibration_matrix['sensor_R_quaternion'], calibration_matrix['sensor_t'], calibration_matrix['ego_R_quaternion'], calibration_matrix['ego_t']
-    box = Box(coord, size, rotation)
+    box = Box(center=coord, size=size, orientation=rotation)
     box.rotate(Quaternion(sensor_R_quaternion))
     box.translate(np.array(sensor_t))
     box.rotate(Quaternion(ego_R_quaternion))
     box.translate(np.array(ego_t))
-    return box.center
+    return box
+
+# def sensor_coord_to_real_coord_y_axis(coord, size, rotation, calibration_matrix):
+#     sensor_R_quaternion, sensor_t, ego_R_quaternion, ego_t = calibration_matrix['sensor_R_quaternion'], calibration_matrix['sensor_t'], calibration_matrix['ego_R_quaternion'], calibration_matrix['ego_t']
+#     box = Box(coord, size, rotation)
+#     box = rotate_box(box, Quaternion(sensor_R_quaternion))
+#     box.translate(-np.array(sensor_t))
+#     box = rotate_box(box, Quaternion(ego_R_quaternion))
+#     box.translate(-np.array(ego_t))
+#     return box
+

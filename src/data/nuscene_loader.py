@@ -13,6 +13,7 @@ import argparse
 sys.path.append('..')
 from utils.camera import *
 from tqdm import tqdm
+from nuscenes.eval.common.utils import angle_diff, quaternion_yaw
 
 class NuScenesLoader:
     def __init__(self, dataset_name, dataroot, num_worker=1, verbose=False):
@@ -70,8 +71,6 @@ class NuScenesLoader:
                     if not data_path in data.keys():
                         data[data_path]={'anns':[], 'calibration_matrix':self.read_sensor(sample_data_token)}
                     for box in boxes:
-        #                 print(box.orientation)
-        #                 print(box.orientation.radians)
                         ann= dict({
                             'category': box.name,
                             'xyz_in_meter': ann_metadata['translation'],
@@ -79,13 +78,15 @@ class NuScenesLoader:
                             'xyz_in_sensor_coor': box.center,
                             # using calibrated coord
                             'box_2d': box_3d_to_2d(box, data[data_path]['calibration_matrix']),
-                            'rotation_angle_degree': box.orientation.degrees,
-                            'rotation_angle_rad': box.orientation.radians,
+                            'rotation_angle_degree': np.sign(quaternion_yaw(box.orientation)) * box.orientation.degrees,
+                            'rotation_angle_rad': quaternion_yaw(box.orientation),
+                            'rotation': box.orientation,
                             'velocity': self.nusc.box_velocity(ann_token),
                             'attribute': self.read_attribute(ann_metadata['attribute_tokens']),
                             'visibility': self.read_visibility(ann_metadata['visibility_token'])
                         })
                         data[data_path]['anns'].append(ann)
+                    # break
         data = [{'scene':sample['scene_token'], 'sample_token': sample['token'], 'image':os.path.abspath(key), 'calibration_matrix':data[key]['calibration_matrix'], 
                  'annotations':data[key]['anns'], } for key in data.keys()]
         return data
@@ -101,15 +102,9 @@ class NuScenesLoader:
             raw_data.append(curr_sample)
             curr_sample = self.nusc.get('sample', curr_sample['next'])
 
-        # pool = Pool(self.num_worker)
-        # data = pool.map(self.read_sample, raw_data)
-        # pool.close()
-        # pool.join()
         merge_list = []
         for item in raw_data:
             merge_list.extend(self.read_sample(item))
-        # for item in data:
-        #     merge_list.extend(item)
         return merge_list
     
     def get_all_categories(self):

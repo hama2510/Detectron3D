@@ -59,16 +59,24 @@ def is_valid_box(box, shape):
         return False
     else:
         return True
+    
+def is_center(point, box):
+    if point[0]-box[0][0]==0 and point[1]-box[0][1]==0:
+        return True
+    return False
 
+def is_near_center(point, box, thres=None):
+    if thres==None:
+        thres = (box[0][1]//4, box[0][1]//4)
+    if point[0]-box[0][0]<=thres[0] and point[1]-box[0][1]<=thres[1]:
+        return True
+    return False
 
 def is_positive_location(point, box, stride, radius):
     box_center = [box[0][0] // stride, box[0][1] // stride]
+    box_strided = [box_center, box[1]//stride, box[2]//stride]
     d = np.sqrt((box_center[0] - point[0]) ** 2 + (box_center[1] - point[1]) ** 2)
-    point = [
-        point[0] * stride + np.floor(stride / 2),
-        point[1] * stride + np.floor(stride / 2),
-    ]
-    (x1, y1), (x2, y2) = xywh_to_xyxy(box)
+    (x1, y1), (x2, y2) = xywh_to_xyxy(box_strided)
     #     if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
     #         return True
     #     else:
@@ -79,74 +87,74 @@ def is_positive_location(point, box, stride, radius):
         return False
 
 
-class NusceneDatasetTransform:
-    def __init__(self, num_worker):
-        self.stride_list = STRIDE_LIST
-        self.m_list = M_LIST
-        self.radius = RADIUS
-        self.num_worker = num_worker
+# class NusceneDatasetTransform:
+#     def __init__(self, num_worker):
+#         self.stride_list = STRIDE_LIST
+#         self.m_list = M_LIST
+#         self.radius = RADIUS
+#         self.num_worker = num_worker
 
-    def update_annotation(self, item):
-        shape = imagesize.get(item["image"])
-        calib_matrix = item["calibration_matrix"]
-        anns = item["annotations"]
-        for stride in self.stride_list:
-            new_shape = [
-                int(np.ceil(shape[0] / stride)),
-                int(np.ceil(shape[1] / stride)),
-            ]
-            for ann in item["annotations"]:
-                if not "targets" in ann.keys():
-                    ann["targets"] = {}
-                ann["targets"][stride] = []
-            for x in range(new_shape[0]):
-                for y in range(new_shape[1]):
-                    boxes = []
-                    for idx, ann in enumerate(anns):
-                        if (
-                            is_valid_box(ann["box_2d"], shape)
-                            and is_positive_location(
-                                [x, y], ann["box_2d"], stride, self.radius
-                            )
-                            and check_box_and_feature_map_level(
-                                [x, y],
-                                ann["box_2d"],
-                                stride,
-                                self.m_list,
-                                self.stride_list,
-                            )
-                        ):
-                            boxes.append([idx, ann])
-                    if len(boxes) > 0:
-                        boxes.sort(
-                            key=lambda item: distance_to_center(
-                                [
-                                    x * stride + np.floor(stride / 2),
-                                    y * stride + np.floor(stride / 2),
-                                ],
-                                item[1]["box_2d"],
-                            )
-                        )
-                        idx = boxes[0][0]
-                        item["annotations"][idx]["targets"][stride].append([x, y])
-        return item
+#     def update_annotation(self, item):
+#         shape = imagesize.get(item["image"])
+#         calib_matrix = item["calibration_matrix"]
+#         anns = item["annotations"]
+#         for stride in self.stride_list:
+#             new_shape = [
+#                 int(np.ceil(shape[0] / stride)),
+#                 int(np.ceil(shape[1] / stride)),
+#             ]
+#             for ann in item["annotations"]:
+#                 if not "targets" in ann.keys():
+#                     ann["targets"] = {}
+#                 ann["targets"][stride] = []
+#             for x in range(new_shape[0]):
+#                 for y in range(new_shape[1]):
+#                     boxes = []
+#                     for idx, ann in enumerate(anns):
+#                         if (
+#                             is_valid_box(ann["box_2d"], shape)
+#                             and is_positive_location(
+#                                 [x, y], ann["box_2d"], stride, self.radius
+#                             )
+#                             and check_box_and_feature_map_level(
+#                                 [x, y],
+#                                 ann["box_2d"],
+#                                 stride,
+#                                 self.m_list,
+#                                 self.stride_list,
+#                             )
+#                         ):
+#                             boxes.append([idx, ann])
+#                     if len(boxes) > 0:
+#                         boxes.sort(
+#                             key=lambda item: distance_to_center(
+#                                 [
+#                                     x * stride + np.floor(stride / 2),
+#                                     y * stride + np.floor(stride / 2),
+#                                 ],
+#                                 item[1]["box_2d"],
+#                             )
+#                         )
+#                         idx = boxes[0][0]
+#                         item["annotations"][idx]["targets"][stride].append([x, y])
+#         return item
 
-    def transform(self, data, out):
-        data = pickle.load(open(data, "rb"))
-        #         data = data[:10]
+#     def transform(self, data, out):
+#         data = pickle.load(open(data, "rb"))
+#         #         data = data[:10]
 
-        if self.num_worker > 0:
-            pool = Pool(self.num_worker)
-            r = list(tqdm(pool.imap(self.update_annotation, data), total=len(data)))
-            pool.close()
-            pool.join()
-        else:
-            for item in tqdm(data):
-                item["annotation"] = self.update_annotation(item)
-            r = data
+#         if self.num_worker > 0:
+#             pool = Pool(self.num_worker)
+#             r = list(tqdm(pool.imap(self.update_annotation, data), total=len(data)))
+#             pool.close()
+#             pool.join()
+#         else:
+#             for item in tqdm(data):
+#                 item["annotation"] = self.update_annotation(item)
+#             r = data
 
-        os.makedirs(os.path.dirname(out), exist_ok=True)
-        pickle.dump(r, open(out, "wb"))
+#         os.makedirs(os.path.dirname(out), exist_ok=True)
+#         pickle.dump(r, open(out, "wb"))
 
 
 class NusceneDataset(Dataset):
@@ -313,13 +321,16 @@ class NusceneDataset(Dataset):
                             int(ann["box_2d"][1] * self.resize),
                             int(ann["box_2d"][2] * self.resize),
                         ]
-                        pass_cond = is_positive_location(
-                            [x, y], box_2d, stride, self.radius
-                        )
+                        box_2d = np.asarray(box_2d, dtype=object)
+                        pass_cond = is_near_center([x, y],  box_2d//stride)
+                        # pass_cond = is_center([x, y],  box_2d//stride)
+                        # pass_cond = is_positive_location(
+                        #     [x, y], box_2d, stride, self.radius
+                        # )
                         # pass_cond = pass_cond and is_valid_box(
                         #     box_2d, (img_shape[1], img_shape[0])
                         # )
-                        #                         pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
+                        # pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
                             new_ann["box_2d"] = box_2d
@@ -329,8 +340,8 @@ class NusceneDataset(Dataset):
                         boxes.sort(
                             key=lambda item: distance_to_center(
                                 [
-                                    x * stride + np.floor(stride / 2),
-                                    y * stride + np.floor(stride / 2),
+                                    x * stride,
+                                    y * stride,
                                 ],
                                 item["box_2d"],
                             )
@@ -347,7 +358,6 @@ class NusceneDataset(Dataset):
                             )
                             dir_cls = 0
                         
-
                         category_onehot = self.gen_category_onehot(box["category"])
                         if category_onehot is None:
                             # skip void objects

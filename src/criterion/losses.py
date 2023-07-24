@@ -64,7 +64,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return ((nn.SmoothL1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum(axis=[1,2])/num_pos).mean()
+                return (nn.SmoothL1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
             
     def l1_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
@@ -75,7 +75,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return ((nn.L1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum(axis=[1,2])/num_pos).mean()
+                return (nn.L1Loss(reduction='none')(pred, target).mean(axis=1)*masked).sum()/num_pos
 
     def bce_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
@@ -87,7 +87,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return ((nn.BCELoss(reduction='none')(pred, target)*masked).sum(axis=[1,2])/num_pos).mean()
+                return (nn.BCELoss(reduction='none')(pred, target)*masked).sum()/num_pos
 
 #     def kl_loss(self, pred, target):
 #         pred, target = self.flattern(pred, target)
@@ -108,7 +108,7 @@ class Criterion(nn.Module):
             if num_pos==0:
                 return 0
             else:
-                return ((nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum(axis=[1,2])/num_pos).mean()
+                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum()/num_pos
 
     def stride_to_feat_level(self, stride):
         return int(np.log2(stride))

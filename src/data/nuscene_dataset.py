@@ -45,36 +45,44 @@ def check_box_and_feature_map_level(point, box, stride, m_list, stride_list):
 
 
 def is_valid_box(box, shape):
-    (x1, y1), (x2, y2) = xywh_to_xyxy(box)
+    (x, y), w, h = box
+    # (x1, y1), (x2, y2) = xywh_to_xyxy(box)
     if (
-        x1 < 0
-        or x2 < 0
-        or y1 < 0
-        or y2 < 0
-        or x1 > shape[0]
-        or x2 > shape[0]
-        or y1 > shape[1]
-        or y2 > shape[1]
+        x < 0
+        or x < shape[0]
+        or y < 0
+        or y > shape[1]
+        #     x1 < 0
+        #     or x2 < 0
+        #     or y1 < 0
+        #     or y2 < 0
+        #     or x1 > shape[0]
+        #     or x2 > shape[0]
+        #     or y1 > shape[1]
+        #     or y2 > shape[1]
     ):
         return False
     else:
         return True
-    
+
+
 def is_center(point, box):
-    if point[0]-box[0][0]==0 and point[1]-box[0][1]==0:
+    if point[0] - box[0][0] == 0 and point[1] - box[0][1] == 0:
         return True
     return False
 
+
 def is_near_center(point, box, thres=None):
-    if thres==None:
-        thres = (box[0][1]//4, box[0][1]//4)
-    if point[0]-box[0][0]<=thres[0] and point[1]-box[0][1]<=thres[1]:
+    if thres == None:
+        thres = (box[0][1] // 4, box[0][1] // 4)
+    if point[0] - box[0][0] <= thres[0] and point[1] - box[0][1] <= thres[1]:
         return True
     return False
+
 
 def is_positive_location(point, box, stride, radius):
     box_center = [box[0][0] // stride, box[0][1] // stride]
-    box_strided = [box_center, box[1]//stride, box[2]//stride]
+    box_strided = [box_center, box[1] // stride, box[2] // stride]
     d = np.sqrt((box_center[0] - point[0]) ** 2 + (box_center[1] - point[1]) ** 2)
     (x1, y1), (x2, y2) = xywh_to_xyxy(box_strided)
     #     if d<radius*stride and point[0]>x1 and point[0]<x2 and point[1]>y1 and point[1]<y2:
@@ -253,7 +261,7 @@ class NusceneDataset(Dataset):
     def offset(self, point, box, stride):
         # return [box[0][0] - point[0], box[0][1] - point[1]]
 
-        return [box[0][0]-point[0]*stride, box[0][1]-point[1]*stride]
+        return [box[0][0] - point[0] * stride, box[0][1] - point[1] * stride]
 
     def gen_target(self, anns, img_shape, stride, calib_matrix):
         shape = [
@@ -323,13 +331,13 @@ class NusceneDataset(Dataset):
                         ]
                         box_2d = np.asarray(box_2d, dtype=object)
                         # pass_cond = is_near_center([x, y],  box_2d//stride)
-                        pass_cond = is_center([x, y],  box_2d//stride)
+                        pass_cond = is_center([x, y], box_2d // stride)
                         # pass_cond = is_positive_location(
                         #     [x, y], box_2d, stride, self.radius
                         # )
-                        # pass_cond = pass_cond and is_valid_box(
-                        #     box_2d, (img_shape[1], img_shape[0])
-                        # )
+                        pass_cond = pass_cond and is_valid_box(
+                            box_2d, (img_shape[1], img_shape[0])
+                        )
                         # pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
@@ -357,7 +365,7 @@ class NusceneDataset(Dataset):
                                 ann["rotation_angle_rad"]
                             )
                             dir_cls = 0
-                        
+
                         category_onehot = self.gen_category_onehot(box["category"])
                         if category_onehot is None:
                             # skip void objects
@@ -368,7 +376,9 @@ class NusceneDataset(Dataset):
                             box["attribute"]
                         )
                         centerness_target[y, x, :] = self.centerness([x, y], box_2d)
-                        offset_target[y, x, :] = self.offset([x, y], box["box_2d"], stride)
+                        offset_target[y, x, :] = self.offset(
+                            [x, y], box["box_2d"], stride
+                        )
                         depth_target[y, x, :] = box["xyz_in_sensor_coor"][2]
                         size_target[y, x, :] = box["box_size"]
                         rotation_target[y, x, :] = rad

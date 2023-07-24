@@ -43,12 +43,15 @@ class Evaluation:
     def clear(self, ):
          shutil.rmtree(self.output_dir) 
             
-    def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05):
+    def evaluate(self, preds, eval_set='val', verbose=False, max_box=100, clear=True, plot_examples=0,conf_th=0.05):
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
         for sample_token in sample_tokens:
             boxes = [item for item in preds if item['sample_token']==sample_token]
+            boxes.sort(key=lambda x: x["detection_score"])
+            if len(boxes) > max_box:
+                boxes = boxes[:max_box]
 #             if len(boxes)==0:
 #                 boxes = [self.dummy_box(sample_token)]
             result['results'][sample_token] = boxes

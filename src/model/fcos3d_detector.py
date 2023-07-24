@@ -367,7 +367,7 @@ class FCOSTransformer:
                 "Running NMS from {} to {} at ".format(total_box, len(boxes)),
                 datetime.now() - start,
             )
-            if len(boxes) > 10000:
-                boxes.sort(key=lambda x: x["detection_score"])
-                boxes = boxes[:10000]
+            # if len(boxes) > 10000:
+            #     boxes.sort(key=lambda x: x["detection_score"])
+            #     boxes = boxes[:10000]
         return boxes

@@ -336,7 +336,7 @@ class NusceneDataset(Dataset):
                         #     [x, y], box_2d, stride, self.radius
                         # )
                         pass_cond = pass_cond and is_valid_box(
-                            box_2d, (img_shape[1], img_shape[0])
+                            box_2d// stride, (img_shape[1], img_shape[0])
                         )
                         # pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:

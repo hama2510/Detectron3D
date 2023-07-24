@@ -49,7 +49,7 @@ def is_valid_box(box, shape):
     # (x1, y1), (x2, y2) = xywh_to_xyxy(box)
     if (
         x < 0
-        or x < shape[0]
+        or x > shape[0]
         or y < 0
         or y > shape[1]
         #     x1 < 0
@@ -336,7 +336,7 @@ class NusceneDataset(Dataset):
                         #     [x, y], box_2d, stride, self.radius
                         # )
                         pass_cond = pass_cond and is_valid_box(
-                            box_2d// stride, (img_shape[1], img_shape[0])
+                            box_2d, (img_shape[1], img_shape[0])
                         )
                         # pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:

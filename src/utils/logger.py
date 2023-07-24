@@ -31,13 +31,20 @@ class Logger:
     def log(self, item, save_dir):
         log_item = {}
         if 'loss' in item.keys():
-            log_item = {'loss':{'total':np.mean(item['loss']['total']), 'component':{}}}
+            log_item = {'loss':{'total':np.mean(item['loss']['total']), 'component':{}}, 
+                        'val_loss':{'total':np.mean(item['val_loss']['total']), 'component':{}}}
+
             for stride in item['loss']['component'].keys():
                 log_item['loss']['component'][stride] = {}
                 for key in item['loss']['component'][stride].keys():
                     log_item['loss']['component'][stride][key] = np.mean(item['loss']['component'][stride][key])
+
+            for stride in item['val_loss']['component'].keys():
+                log_item['val_loss']['component'][stride] = {}
+                for key in item['val_loss']['component'][stride].keys():
+                    log_item['val_loss']['component'][stride][key] = np.mean(item['val_loss']['component'][stride][key])
         for key in item.keys():
-            if key!='loss':
+            if key!='loss' and key!='val_loss':
                 log_item[key] = item[key]
         log = pickle.load(open(os.path.join(save_dir, self.log_file), 'rb'))
         log.append(log_item)

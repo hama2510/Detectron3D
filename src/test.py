@@ -61,6 +61,7 @@ if __name__ == '__main__':
         imgs = imgs.to(config.device)
         sample_token = samples['sample_token']
         targets = samples['target']
+
         calibration_matrix = samples['calibration_matrix']
         for task_id in range(0, len(tasks)):
             model = tasks[task_id]['model']

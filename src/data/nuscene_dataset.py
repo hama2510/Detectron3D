@@ -322,8 +322,8 @@ class NusceneDataset(Dataset):
                             int(ann["box_2d"][2] * self.resize),
                         ]
                         box_2d = np.asarray(box_2d, dtype=object)
-                        pass_cond = is_near_center([x, y],  box_2d//stride)
-                        # pass_cond = is_center([x, y],  box_2d//stride)
+                        # pass_cond = is_near_center([x, y],  box_2d//stride)
+                        pass_cond = is_center([x, y],  box_2d//stride)
                         # pass_cond = is_positive_location(
                         #     [x, y], box_2d, stride, self.radius
                         # )

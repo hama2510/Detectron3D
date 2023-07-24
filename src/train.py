@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     dataset_train = NusceneDataset(config.data.train, config=config)
     dataloader_train = DataLoader(dataset_train, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    dataset_val = NusceneDataset(config.data.val, config=config, return_target=False)
+    dataset_val = NusceneDataset(config.data.val, config=config, return_target=True)
     dataloader_val = DataLoader(dataset_val, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     criterion = Criterion(device=config.device)
     evaluation = Evaluation(config.data.dataset_name, config.data.image_root, config.data.val_config_path)
@@ -55,7 +55,9 @@ if __name__ == '__main__':
         model = FCOSDetector(model_config)
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 #         optimizer = Lion(model.parameters(), lr=config.lr)
-        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 'best_score':0, 'loss': logger.init_loss_log()})
+        models.append({'model':model, 'optimizer':optimizer, 'config':model_config, 'pred':[], 
+                       'best_score':0, 'loss': logger.init_loss_log(), 
+                       'val_loss': logger.init_loss_log()})
         logger.create_log_file(model_config.model.save_dir)
     
     for epoch in range(1, config.epochs+1):
@@ -87,10 +89,13 @@ if __name__ == '__main__':
 
                     loss_str+='{:.4f},'.format(np.mean(models[model_id]['loss']['total']))
                     del pred
+                    del loss
+                    del model
                 loss_str = loss_str[:-1]
                 tepoch.set_postfix(ep=epoch, loss=loss_str)
                 sleep(0.1)
-#                 break
+                del targets
+                del imgs
                 
 #         # valid
         print('Validating ...')
@@ -102,9 +107,15 @@ if __name__ == '__main__':
             imgs = imgs.to(config.device)
             sample_token = samples['sample_token']
             calibration_matrix = samples['calibration_matrix']
+            targets = samples['target']
             for model_id in range(0, len(models)):
                 model = models[model_id]['model']
                 pred = model(imgs)
+                loss, loss_log = criterion(targets, pred)
+                models[model_id]['val_loss']['total'].append(loss.cpu().detach().numpy())
+                for stride in loss_log.keys():
+                    for key in loss_log[stride].keys():
+                        models[model_id]['val_loss']['component'][int(stride)][key].append(loss_log[stride][key])
                 for i in range(len(sample_token)):
                     calib_matrix = {}
                     for key in calibration_matrix.keys():
@@ -115,10 +126,16 @@ if __name__ == '__main__':
                         for sub_key in pred[key].keys():
                             item['pred'][key][sub_key] = model.item_tensor_to_numpy(sub_key, pred[key][sub_key][i])
                     models[model_id]['pred'].append(item)
+
+                    
                 del pred
+                del model
+                del loss
+            del targets
+            del imgs
         start = datetime.now()
         for model_id in range(0, len(models)):
-#             model = models[model_id]['model']
+            model = models[model_id]['model']
             preds = transformer.transform_predicts(models[model_id]['pred'])
             
             del models[model_id]['pred']
@@ -133,14 +150,16 @@ if __name__ == '__main__':
                 metrics_summary = {}
                 nds = 0
             
-            logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
+            logger.log({'epoch': epoch, 'loss': models[model_id]['loss'], 'val_loss':models[model_id]['val_loss'], 'metrics_summary':metrics_summary}, models[model_id]['config'].model.save_dir)
             print('epoch={},model={},loss={},nds={:.2f}'.format(epoch, models[model_id]['config'].model.model_name, np.mean(models[model_id]['loss']['total']), nds))
             
             del metrics_summary
             del models[model_id]['loss']
+            del models[model_id]['val_loss']
             del preds
             
             models[model_id]['loss'] = logger.init_loss_log()
+            models[model_id]['val_loss'] = logger.init_loss_log()
             
             if config.save_best:
                 if nds>models[model_id]['best_score']:
@@ -149,4 +168,5 @@ if __name__ == '__main__':
                 model.save_model(os.path.join(models[model_id]['config'].model.save_dir, 'model_{}.pth'.format(epoch)))
             if nds>models[model_id]['best_score']:
                 models[model_id]['best_score'] = nds
+            del model
         print(datetime.now()-start)

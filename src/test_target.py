@@ -67,8 +67,6 @@ if __name__ == "__main__":
             }
         )
     
-    arr = []
-
     #     for step, samples in enumerate(dataloader_val):
     for step, samples in enumerate(tqdm(dataloader_val, desc="Valid", leave=False)):
         imgs = samples["img"]
@@ -76,6 +74,7 @@ if __name__ == "__main__":
         imgs = imgs.to(config.device)
         sample_token = samples["sample_token"]
         targets = samples["target"]
+
         
         calibration_matrix = samples["calibration_matrix"]
         for task_id in range(0, len(tasks)):
@@ -99,12 +98,10 @@ if __name__ == "__main__":
                     for sub_key in pred[key].keys():
                         item["pred"][key][sub_key] = pred[key][sub_key][i].detach().cpu().numpy()
 
-                if sample_token[i]=='0d0700a2284e477db876c3ee1d864668':
-                    arr.append(item)
+
                 tasks[task_id]["pred"].append(item)
             # del pred
     #         break
-    pickle.dump(arr, open('/home/kiennt/KienNT/research/Detectron3D/exp/mobilenet_fused_r_old/result/test_code.pkl', 'wb'))
     start = datetime.now()
     for task_id in range(0, len(tasks)):
         preds = transformer.transform_predicts(tasks[task_id]["pred"], target=True)

@@ -57,7 +57,7 @@ if __name__ == '__main__':
     output_dir = '/home/kiennt/KienNT/research/test_result'
     result_path = os.path.join(output_dir, 'result_tmp.json')
     meta = pickle.load(open('/home/kiennt/KienNT/research/data/nuScenes/pickle/mini/meta.pkl', 'rb'))
-    plot_examples = 10
+    plot_examples = 20
     conf_th=0.05
     # print(meta)
     # exit()
@@ -70,19 +70,13 @@ if __name__ == '__main__':
             for ann in box['annotations']:
                 if meta['category_map'][ann['category'].split('.')[-1]]=='void':
                     continue
-                r = ann['rotation']
-                rr = Quaternion(axis=[0, 0, 1], angle=quaternion_yaw(r))
-                rotation = r
+                # r = ann['rotation']
+                rr = Quaternion(axis=[0, 0, 1], angle=ann['yaw_angle_rad'])
                 
-                # r_sensor = Quaternion(box['calibration_matrix']['sensor_R_quaternion'])
-                # r_ego = Quaternion(box['calibration_matrix']['ego_R_quaternion'])
-                # rotation_real = r_ego * (r_sensor * rotation) 
                 box_real = sensor_coord_to_real_coord(
-                            ann['xyz_in_sensor_coor'], ann['box_size'], rr, box['calibration_matrix']
+                            ann['xyz_in_sensor_coor'], ann['box_size'], rr, box['calibration_matrix'], rotate_yaw_only=True
                         )
-                # box_real_ = sensor_coord_to_real_coord(
-                #             ann['xyz_in_sensor_coor'], ann['box_size'], rr, box['calibration_matrix']
-                #         )
+
                 test_box = {
                     'sample_token': box['sample_token'],
                     # 'translation': ann['xyz_in_meter'],

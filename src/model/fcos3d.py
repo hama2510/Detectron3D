@@ -52,7 +52,7 @@ class ClassificationHead(nn.Module):
         x = self.convs(x)
         outs = OrderedDict()
         outs['category'] = self.sigmoid(self.conv_cate(x))
-        outs['attribute'] = self.conv_attr(x)
+        outs['attribute'] = self.sigmoid(self.conv_attr(x))
         return outs
 
 class RegressionHead(nn.Module):
@@ -78,6 +78,6 @@ class RegressionHead(nn.Module):
         outs['depth'] = self.relu(self.conv_depth(x))
         outs['size'] = self.relu(self.conv_size(x))
         outs['rotation'] = self.tanh(self.conv_rotation(x))
-        outs['dir'] = self.conv_dir(x)
+        outs['dir'] = self.sigmoid(self.conv_dir(x))
         outs['velocity'] = self.conv_velo(x)
         return outs

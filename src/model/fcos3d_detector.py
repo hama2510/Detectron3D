@@ -243,7 +243,7 @@ class FCOSTransformer:
                     if attribute == "void":
                         attribute = ""
                 box_real = sensor_coord_to_real_coord(
-                    coord_3d, size, rotation_q, calib_matrix
+                    coord_3d, size, rotation_q, calib_matrix, rotate_yaw_only=True
                 )
                 boxes.append(
                     {
@@ -315,7 +315,7 @@ class FCOSTransformer:
                     if attribute == "void":
                         attribute = ""
                 box_real = sensor_coord_to_real_coord(
-                    coord_3d, size, rotation_q, calib_matrix
+                    coord_3d, size, rotation_q, calib_matrix, rotate_yaw_only=True
                 )
                 boxes.append(
                     {
@@ -367,7 +367,4 @@ class FCOSTransformer:
                 "Running NMS from {} to {} at ".format(total_box, len(boxes)),
                 datetime.now() - start,
             )
-            # if len(boxes) > 10000:
-            #     boxes.sort(key=lambda x: x["detection_score"])
-            #     boxes = boxes[:10000]
         return boxes

@@ -291,11 +291,11 @@ class NusceneDataset(Dataset):
             #         )
             #         if self.rotation_encode == "sin_pi_and_bin":
             #             rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-            #                 ann["rotation_angle_rad"]
+            #                 ann["yaw_angle_rad"]
             #             )
             #         elif self.rotation_encode == "pi_and_minus_pi":
             #             rad = self.rotation_angle_to_pi_and_minus_pi(
-            #                 ann["rotation_angle_rad"]
+            #                 ann["yaw_angle_rad"]
             #             )
             #             dir_cls = 0
 
@@ -358,11 +358,11 @@ class NusceneDataset(Dataset):
                         box_2d = np.asarray(box["box_2d"], dtype=object) // stride
                         if self.rotation_encode == "sin_pi_and_bin":
                             rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                                ann["rotation_angle_rad"]
+                                ann["yaw_angle_rad"]
                             )
                         elif self.rotation_encode == "pi_and_minus_pi":
                             rad = self.rotation_angle_to_pi_and_minus_pi(
-                                ann["rotation_angle_rad"]
+                                ann["yaw_angle_rad"]
                             )
                             dir_cls = 0
 

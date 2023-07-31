@@ -85,6 +85,9 @@ class Evaluation:
                                  eval_range=max(nusc_eval.cfg.class_range.values()),
                                  savepath=os.path.join(example_dir, '{}.png'.format(sample_token)))
                 
+
+            
+                
         metrics, metric_data_list = nusc_eval.evaluate()
         metrics_summary = metrics.serialize()
         with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:

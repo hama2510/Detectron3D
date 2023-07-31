@@ -80,20 +80,27 @@ def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
     return coord_3d
 
 
-# def rotate_box(box, quaternion):
-#     q = Quaternion(axis=[0,0,1], angle=quaternion_yaw(quaternion))
-#     box.center = np.dot(quaternion.rotation_matrix, box.center)
-#     box.orientation = q * box.orientation
-#     box.velocity = np.dot(quaternion.rotation_matrix, box.velocity)
-#     return box 
+def rotate_box_by_yaw(box, quaternion):
+    yaw = Quaternion(axis=[0,0,1], angle=quaternion.yaw_pitch_roll[0])
+    box.center = np.dot(quaternion.rotation_matrix, box.center)
+    box.orientation = yaw * box.orientation
+    box.velocity = np.dot(quaternion.rotation_matrix, box.velocity)
 
-def sensor_coord_to_real_coord(coord, size, rotation, calibration_matrix):
+    return box 
+
+def sensor_coord_to_real_coord(coord, size, rotation, calibration_matrix, rotate_yaw_only=False):
     sensor_R_quaternion, sensor_t, ego_R_quaternion, ego_t = calibration_matrix['sensor_R_quaternion'], calibration_matrix['sensor_t'], calibration_matrix['ego_R_quaternion'], calibration_matrix['ego_t']
     box = Box(center=coord, size=size, orientation=rotation)
-    box.rotate(Quaternion(sensor_R_quaternion))
-    box.translate(np.array(sensor_t))
-    box.rotate(Quaternion(ego_R_quaternion))
-    box.translate(np.array(ego_t))
+    if not rotate_yaw_only:
+        box.rotate(Quaternion(sensor_R_quaternion))
+        box.translate(np.array(sensor_t))
+        box.rotate(Quaternion(ego_R_quaternion))
+        box.translate(np.array(ego_t))
+    else:
+        box = rotate_box_by_yaw(box, Quaternion(sensor_R_quaternion))
+        box.translate(np.array(sensor_t))
+        box = rotate_box_by_yaw(box, Quaternion(ego_R_quaternion))
+        box.translate(np.array(ego_t))
     return box
 
 # def sensor_coord_to_real_coord_y_axis(coord, size, rotation, calibration_matrix):

@@ -98,17 +98,40 @@ class Criterion(nn.Module):
 #         # loss = loss.sum()/pos_inds.float().sum()
 #         return loss
 
+#     def cross_entropy_loss(self, pred, target, masked):
+#         pred, target = self.flattern(pred, target)
+# #         pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
+#         if masked is None:
+#             return nn.CrossEntropyLoss()(pred, target)
+#         else:
+#             num_pos = masked.sum()
+#             if num_pos==0:
+#                 return 0
+#             else:
+#                 return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum()/num_pos
+            
     def cross_entropy_loss(self, pred, target, masked):
         pred, target = self.flattern(pred, target)
-#         pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
-        if masked is None:
-            return nn.CrossEntropyLoss()(pred, target)
+        pred = torch.clamp(pred, min=self.esp, max=1-self.esp)
+        
+        pos_inds = target.eq(1)
+        neg_inds = target.lt(1)
+        
+        pos_pred = pred[pos_inds]
+        neg_pred = pred[neg_inds]
+
+        pos_loss = torch.log(pos_pred)
+        neg_loss = torch.log(1 - neg_pred)
+
+        num_pos  = pos_inds.float().sum()
+        pos_loss = pos_loss.sum()
+        neg_loss = neg_loss.sum()
+
+        if num_pos == 0:
+            loss = 0 - neg_loss
         else:
-            num_pos = masked.sum()
-            if num_pos==0:
-                return 0
-            else:
-                return (nn.CrossEntropyLoss(reduction='none')(pred, target)*masked).sum()/num_pos
+            loss = 0 - (pos_loss + neg_loss) / num_pos
+        return loss
 
     def stride_to_feat_level(self, stride):
         return int(np.log2(stride))
@@ -125,7 +148,7 @@ class Criterion(nn.Module):
 
         category_loss = self.focal_loss(pred['category'], target['category'])
         attribute_loss = self.cross_entropy_loss(pred['attribute'], target['attribute'], masked)
-        centerness_loss = self.bce_loss(pred['centerness'], target['centerness'], masked)
+        centerness_loss = self.cross_entropy_loss(pred['centerness'], target['centerness'], masked)
         offset_loss = self.smooth_l1_loss(pred['offset'], target['offset'], masked)
         depth_loss = self.smooth_l1_loss(torch.exp(pred['depth']), target['depth'], masked)
         size_loss = self.smooth_l1_loss(pred['size'], target['size'], masked)

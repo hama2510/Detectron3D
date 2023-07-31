@@ -201,9 +201,9 @@ class NusceneDatasetFCOS3D(Dataset):
                     box_2d = (
                         np.asarray(ann["box_2d"], dtype=object) // stride * self.resize
                     )
-                    #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(ann['rotation_angle_rad'])
+                    #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(ann['yaw_angle_rad'])
                     rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                        ann["rotation_angle_rad"]
+                        ann["yaw_angle_rad"]
                     )
 
                     category_onehot = self.gen_category_onehot(ann["category"])
@@ -260,9 +260,9 @@ class NusceneDatasetFCOS3D(Dataset):
                         )
                         box = boxes[0]
                         box_2d = np.asarray(box["box_2d"], dtype=object) // stride
-                        #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['rotation_angle_rad'])
+                        #                     rad, dir_cls = self.rotation_angle_to_pi_and_bin(box['yaw_angle_rad'])
                         rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                            box["rotation_angle_rad"]
+                            box["yaw_angle_rad"]
                         )
 
                         category_onehot = self.gen_category_onehot(box["category"])

@@ -185,6 +185,7 @@ class FCOSTransformer:
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]
+        img_path = pred['img_path']
         #         stride_list = [32, 64]
         for key in pred["pred"].keys():
             #             stride = int(key)
@@ -256,6 +257,7 @@ class FCOSTransformer:
                         "detection_name": category,
                         "detection_score": sc,
                         "attribute_name": attribute,
+                        "img_path": img_path
                     }
                 )
         return boxes, calib_matrix
@@ -264,6 +266,7 @@ class FCOSTransformer:
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]
+        img_path = pred['img_path']
         for key in pred["pred"].keys():
             stride = int(key)
             category_map = pred["pred"][key]["category"]
@@ -328,6 +331,7 @@ class FCOSTransformer:
                         "detection_name": category,
                         "detection_score": sc,
                         "attribute_name": attribute,
+                        'img_path': img_path
                     }
                 )
         return boxes, calib_matrix

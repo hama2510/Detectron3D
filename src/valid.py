@@ -8,6 +8,11 @@ from nuscenes.eval.common.loaders import load_gt
 from nuscenes.eval.detection.data_classes import DetectionBox
 from functools import partial
 from multiprocessing import Pool
+import numpy as np
+import cv2 as cv
+from camera import coord_3d_to_2d
+from nuscenes.utils.data_classes import Box
+from pyquaternion import Quaternion
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -19,6 +24,20 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
     
+# def draw_cube(item):
+#     cube_edges = [
+#         (0, 1), (1, 2), (2, 3), (3, 0),
+#         (0, 4), (1, 5), (2, 6), (3, 7),
+#         (4, 5), (5, 6), (6, 7), (7, 4)
+#     ]
+#     box = Box(item['translation'], item['size'], item(item['rotation']))
+#     corners = box.corners()
+#     corners_2d = np.asarray([coord_3d_to_2d(corners[:,i], calib, calibrated=True) for i in range(corners.shape[1])])
+#     for edge in cube_edges:
+#         start_point = corners_2d[edge[0]]
+#         end_point = corners_2d[edge[1]]
+#         img = cv.line(img, start_point, end_point, (0, 0, 255), 1)
+
 class Evaluation:
     def __init__(self, dataset_name, dataroot, eval_config, verbose=False, output_dir='../tmp/'):
         self.nusc = NuScenes(version=dataset_name, dataroot=dataroot, verbose=verbose)
@@ -43,15 +62,15 @@ class Evaluation:
     def clear(self, ):
          shutil.rmtree(self.output_dir) 
             
-    def evaluate(self, preds, eval_set='val', verbose=False, max_box=100, clear=True, plot_examples=0,conf_th=0.05):
+    def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05):
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
         for sample_token in sample_tokens:
-            boxes = [item for item in preds if item['sample_token']==sample_token]
+            boxes = [item[0] for item in preds if item['sample_token']==sample_token]
             boxes.sort(key=lambda x: x["detection_score"])
-            if len(boxes) > max_box:
-                boxes = boxes[:max_box]
+            if len(boxes) > 10000:
+                boxes = boxes[:10000]
 #             if len(boxes)==0:
 #                 boxes = [self.dummy_box(sample_token)]
             result['results'][sample_token] = boxes
@@ -66,6 +85,11 @@ class Evaluation:
             cfg_ = DetectionConfig.deserialize(json.load(_f))
         nusc_eval = DetectionEval(self.nusc, config=cfg_, result_path=self.result_path, eval_set=eval_set, output_dir=self.output_dir, verbose=verbose)
         
+        metrics, metric_data_list = nusc_eval.evaluate()
+        metrics_summary = metrics.serialize()
+        with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:
+            json.dump(metrics_summary, f, indent=2)
+
         if plot_examples > 0:
             # Select a random but fixed subset to plot.
             random.seed(42)
@@ -75,24 +99,25 @@ class Evaluation:
 
             # Visualize samples.
             example_dir = os.path.join(self.output_dir, 'examples')
-            os.makedirs(example_dir, exist_ok=True)
             for sample_token in sample_tokens:
-                visualize_sample(self.nusc,
-                                 sample_token,
-                                 nusc_eval.gt_boxes if nusc_eval.eval_set != 'test' else EvalBoxes(),
-                                 nusc_eval.pred_boxes,
-                                 conf_th=conf_th,
-                                 eval_range=max(nusc_eval.cfg.class_range.values()),
-                                 savepath=os.path.join(example_dir, '{}.png'.format(sample_token)))
-                
+                dir =  os.path.join(example_dir, sample_token)
+                os.makedirs(dir, exist_ok=True)
 
-            
-                
-        metrics, metric_data_list = nusc_eval.evaluate()
-        metrics_summary = metrics.serialize()
-        with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:
-            json.dump(metrics_summary, f, indent=2)
-        
+                try:
+                    visualize_sample(self.nusc,
+                                    sample_token,
+                                    nusc_eval.gt_boxes if nusc_eval.eval_set != 'test' else EvalBoxes(),
+                                    nusc_eval.pred_boxes,
+                                    conf_th=conf_th,
+                                    eval_range=max(nusc_eval.cfg.class_range.values()),
+                                    savepath=os.path.join(dir, '{}.png'.format(sample_token)))
+                except Exception as e:
+                    print(e)
+                # items = [item for item in preds if item['sample_token']==sample_token]
+                # imgs = np.unique([item['img_path'] for item in items])
+                # for path in imgs:
+                #     img = cv.imread(path)
+
         metrics_summary = json.load(open(os.path.join(self.output_dir, 'metrics_summary.json'), 'r'))
         if clear:
             self.clear() 

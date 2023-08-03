@@ -61,6 +61,7 @@ if __name__ == '__main__':
         imgs = imgs.to(config.device)
         sample_token = samples['sample_token']
         targets = samples['target']
+        img_paths = samples['img_path']
 
         calibration_matrix = samples['calibration_matrix']
         for task_id in range(0, len(tasks)):
@@ -71,7 +72,7 @@ if __name__ == '__main__':
                 calib_matrix = {}
                 for key in calibration_matrix.keys():
                     calib_matrix[key] = calibration_matrix[key][i].detach().cpu().numpy()
-                item = {'sample_token':sample_token[i], 'calibration_matrix':calib_matrix, 'pred':{}}
+                item = {'sample_token':sample_token[i], 'calibration_matrix':calib_matrix, 'pred':{}, 'img_path':img_paths[i]}
                 for key in pred.keys():
                     item['pred'][key]={}
                     for sub_key in pred[key].keys():

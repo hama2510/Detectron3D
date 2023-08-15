@@ -13,7 +13,7 @@ M_LIST = [0, np.inf]
 RADIUS = 1.5
 
 
-class NusceneDatasetFCOS3D(NusceneDataset):
+class NusceneDatasetCenterNet(NusceneDataset):
     def __init__(self, data_file, config, return_target=True):
         super().__init__(data_file, config, return_target)
         self.stride_list = STRIDE_LIST
@@ -31,12 +31,10 @@ class NusceneDatasetFCOS3D(NusceneDataset):
         attribute_target = np.zeros(
             (shape[0], shape[1], len(self.meta_data["attributes"]))
         )
-        centerness_target = np.zeros((shape[0], shape[1], 1))
         offset_target = np.zeros((shape[0], shape[1], 2))
         depth_target = np.zeros((shape[0], shape[1], 1))
         size_target = np.zeros((shape[0], shape[1], 3))
         rotation_target = np.zeros((shape[0], shape[1], 1))
-        dir_target = np.zeros((shape[0], shape[1], 2))
         velocity_target = np.zeros((shape[0], shape[1], 2))
 
         if self.transformed:
@@ -46,26 +44,22 @@ class NusceneDatasetFCOS3D(NusceneDataset):
                 for y in range(shape[0]):
                     boxes = []
                     for ann in anns:
-                        box_2d = [
-                            np.array(
-                                [
-                                    int(ann["box_2d"][0][0] * self.resize),
-                                    int(ann["box_2d"][0][1] * self.resize),
-                                ]
-                            ),
-                            int(ann["box_2d"][1] * self.resize),
-                            int(ann["box_2d"][2] * self.resize),
-                        ]
-                        box_2d = np.asarray(box_2d, dtype=object)
-                        # pass_cond = is_near_center([x, y],  box_2d//stride)
+                        box_2d = np.array(
+                            [
+                                np.array(
+                                    [
+                                        int(ann["box_2d"][0][0] * self.resize),
+                                        int(ann["box_2d"][0][1] * self.resize),
+                                    ]
+                                ),
+                                int(ann["box_2d"][1] * self.resize),
+                                int(ann["box_2d"][2] * self.resize),
+                            ], dtype=object
+                        )
                         pass_cond = is_center([x, y], box_2d // stride)
-                        # pass_cond = is_positive_location(
-                        #     [x, y], box_2d, stride, self.radius
-                        # )
                         pass_cond = pass_cond and is_valid_box(
                             box_2d, (img_shape[1], img_shape[0])
                         )
-                        # pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
                             new_ann["box_2d"] = box_2d
@@ -75,23 +69,17 @@ class NusceneDatasetFCOS3D(NusceneDataset):
                         boxes.sort(
                             key=lambda item: distance_to_center(
                                 [
-                                    x * stride,
-                                    y * stride,
+                                    x * stride + np.floor(stride / 2),
+                                    y * stride + np.floor(stride / 2),
                                 ],
                                 item["box_2d"],
                             )
                         )
                         box = boxes[0]
                         box_2d = np.asarray(box["box_2d"], dtype=object) // stride
-                        if self.rotation_encode == "sin_pi_and_bin":
-                            rad, dir_cls = self.rotation_angle_to_sin_pi_and_bin(
-                                ann["yaw_angle_rad"]
-                            )
-                        elif self.rotation_encode == "pi_and_minus_pi":
-                            rad = self.rotation_angle_to_pi_and_minus_pi(
-                                ann["yaw_angle_rad"]
-                            )
-                            dir_cls = 0
+                        rad = self.rotation_angle_to_pi_and_minus_pi(
+                            box["yaw_angle_rad"]
+                        )
 
                         category_onehot = self.gen_category_onehot(box["category"])
                         if category_onehot is None:
@@ -102,24 +90,18 @@ class NusceneDatasetFCOS3D(NusceneDataset):
                         attribute_target[y, x, :] = self.gen_attribute_onehot(
                             box["attribute"]
                         )
-                        centerness_target[y, x, :] = self.centerness([x, y], box_2d)
-                        offset_target[y, x, :] = self.offset(
-                            [x, y], box["box_2d"], stride
-                        )
+                        offset_target[y, x, :] = self.offset([x, y], box_2d, stride)
                         depth_target[y, x, :] = box["xyz_in_sensor_coor"][2]
                         size_target[y, x, :] = box["box_size"]
                         rotation_target[y, x, :] = rad
-                        dir_target[y, x, :] = dir_cls
                         velocity_target[y, x, :] = self.gen_velocity(box["velocity"])
 
         return {
             "category": torch.FloatTensor(category_target),
             "attribute": torch.FloatTensor(attribute_target),
-            "centerness": torch.FloatTensor(centerness_target),
             "offset": torch.FloatTensor(offset_target),
             "depth": torch.FloatTensor(depth_target),
             "size": torch.FloatTensor(size_target),
             "rotation": torch.FloatTensor(rotation_target),
-            "dir": torch.FloatTensor(dir_target),
             "velocity": torch.FloatTensor(velocity_target),
         }

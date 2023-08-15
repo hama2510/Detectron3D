@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from .fpn import FusedFPN, FusedFPNP3
+from model.module.fpn import FusedFPN, FusedFPNP3
 from .fcos3d import ClassificationHead, RegressionHead
 from collections import OrderedDict
 

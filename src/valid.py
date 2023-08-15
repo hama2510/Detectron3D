@@ -10,7 +10,7 @@ from functools import partial
 from multiprocessing import Pool
 import numpy as np
 import cv2 as cv
-from camera import coord_3d_to_2d
+from utils.camera import coord_3d_to_2d
 from nuscenes.utils.data_classes import Box
 from pyquaternion import Quaternion
 

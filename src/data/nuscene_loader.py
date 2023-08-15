@@ -21,14 +21,6 @@ from typing import Tuple, List
 
 
 class MyNuScenes(NuScenes):
-
-    # def __init__(self,
-    #              version: str = 'v1.0-mini',
-    #              dataroot: str = '/data/sets/nuscenes',
-    #              verbose: bool = True,
-    #              map_resolution: float = 0.1):
-    #     super(NuScenes).__init__(version, dataroot, verbose, map_resolution)
-
     def get_sample_data(
         self,
         sample_data_token: str,
@@ -83,7 +75,9 @@ class MyNuScenes(NuScenes):
                     r_sensor_yaw = Quaternion(
                         axis=[0, 0, 1], angle=r_sensor.yaw_pitch_roll[0]
                     )
-                    yaw = (r_sensor_yaw.inverse * (r_ego_yaw.inverse * orientation_yaw)).yaw_pitch_roll[0]
+                    yaw = (
+                        r_sensor_yaw.inverse * (r_ego_yaw.inverse * orientation_yaw)
+                    ).yaw_pitch_roll[0]
                 else:
                     yaw = None
 
@@ -117,15 +111,6 @@ class NuScenesLoader:
         cs_record = self.nusc.get(
             "calibrated_sensor", sd_record["calibrated_sensor_token"]
         )
-        #         return dict({
-        #             'sensor_R_quaternion': np.asarray(cs_record['rotation']),
-        #             'sensor_R': np.asarray(quaternion_transformer.from_quat(cs_record['rotation']).as_matrix()),
-        #             'sensor_t': np.asarray(cs_record['translation']),
-        #             'ego_R_quaternion': np.asarray(pose_record['rotation']),
-        #             'ego_R': np.asarray(quaternion_transformer.from_quat(pose_record['rotation']).as_matrix()),
-        #             'ego_t': np.asarray(pose_record['translation']),
-        #             'camera_intrinsic': np.asarray(cs_record['camera_intrinsic'])
-        #         })
         return dict(
             {
                 "sensor_R_quaternion": Quaternion(cs_record["rotation"]).elements,
@@ -160,7 +145,8 @@ class NuScenesLoader:
                 #     sample["data"][cam], selected_anntokens=[ann_token], return_yaw=True
                 # )
                 data_path, boxes, _ = self.nusc.get_sample_data(
-                    sample["data"][cam], selected_anntokens=[ann_token],
+                    sample["data"][cam],
+                    selected_anntokens=[ann_token],
                 )
                 if len(boxes) > 0:
                     sample_data_token = sample["data"][cam]
@@ -173,7 +159,11 @@ class NuScenesLoader:
                             "anns": [],
                             "calibration_matrix": self.read_sensor(sample_data_token),
                         }
-                    for box, yaw in boxes:
+                    for i, box, yaw in enumerate(boxes):
+                        if i == 0:
+                            tag = "pos"
+                        else:
+                            tag = "dc"
                         ann = dict(
                             {
                                 "category": box.name,
@@ -184,7 +174,6 @@ class NuScenesLoader:
                                 "box_2d": box_3d_to_2d(
                                     box, data[data_path]["calibration_matrix"]
                                 ),
-                                # 'rotation_angle_degree': np.sign(quaternion_yaw(box.orientation)) * box.orientation.degrees,
                                 "yaw_angle_rad": yaw,
                                 "rotation": box.orientation,
                                 "velocity": self.nusc.box_velocity(ann_token),
@@ -194,10 +183,10 @@ class NuScenesLoader:
                                 "visibility": self.read_visibility(
                                     ann_metadata["visibility_token"]
                                 ),
+                                "tag": tag,
                             }
                         )
                         data[data_path]["anns"].append(ann)
-                    # break
         data = [
             {
                 "scene": sample["scene_token"],

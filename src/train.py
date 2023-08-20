@@ -51,7 +51,7 @@ class RunTask:
         return criterion
 
     def init_transformer(self):
-        return get_transform(self.conf.model.transform)
+        return get_transform(self.conf.model.transform)(self.conf)
 
     def train(self, imgs, targets):
         imgs = imgs.to(self.conf.device)
@@ -194,7 +194,7 @@ if __name__ == "__main__":
                             ] = task.model.item_tensor_to_numpy(
                                 sub_key, preds[key][sub_key][i]
                             )
-                    tasks[task_id]["pred"].append(item)
+                    logs[task_id]["pred"].append(item)
 
                 del preds
                 del task

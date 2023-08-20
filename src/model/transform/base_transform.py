@@ -75,7 +75,7 @@ class BaseTransformer:
         if self.config.num_workers <= 1:
             for pred in preds:
                 boxes.extend(
-                    self.transform_predict(pred, det_thres=self.config.det_thres)
+                    self.transform_predict(pred, det_thres=self.config.demo.det_thres)
                 )
         else:
             if not target:
@@ -86,7 +86,7 @@ class BaseTransformer:
             pool = Pool(self.config.num_workers)
             data = list(
                 pool.imap(
-                    partial(func, det_thres=self.config.det_thres),
+                    partial(func, det_thres=self.config.demo.det_thres),
                     preds,
                 )
             )
@@ -98,7 +98,7 @@ class BaseTransformer:
             for item, calib_matrix in data:
                 # keep_indices = list(range(len(item)))
                 keep_indices = rotated_nms(
-                    item, calib_matrix, nms_thres=self.config.nms_thres
+                    item, calib_matrix, nms_thres=self.config.demo.nms_thres
                 )
                 boxes.extend([item[i] for i in keep_indices])
             print(

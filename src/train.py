@@ -5,7 +5,7 @@ import argparse
 from omegaconf import OmegaConf
 from tqdm import tqdm
 import sys, os
-from valid import Evaluation
+from evaluation import Evaluation
 from utils.logger import Logger
 from time import sleep
 import random

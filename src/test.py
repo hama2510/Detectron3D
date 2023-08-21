@@ -13,7 +13,7 @@ import torch.optim as optim
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import sys, os
-from valid import Evaluation
+from evaluation import Evaluation
 import pickle
 from utils.logger import Logger
 from time import sleep

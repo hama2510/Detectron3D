@@ -3,7 +3,7 @@ from .base_transform import BaseTransformer
 
 
 class CenterNetTransformer(BaseTransformer):
-    def transform_predict(self, pred, det_thres=0.5):
+    def transform_predict(self, pred, det_thres=0.5, topk=-1):
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]

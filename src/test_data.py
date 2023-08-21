@@ -2,26 +2,15 @@ import pandas as pd
 import cv2 as cv
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
-from data.nuscene_dataset import NusceneDataset
-from model.fcos3d_detector import FCOSDetector, FCOSTransformer
-from criterion.losses import Criterion
 import argparse
 from omegaconf import OmegaConf
-import torch.optim as optim
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import sys, os
 from evaluation import Evaluation
 import pickle
-from utils.logger import Logger
-from time import sleep
 import random
 import torch
-from torch import optim
-from numba import cuda
-from datetime import datetime
 from nuscenes.eval.common.loaders import load_gt
 from nuscenes.eval.detection.data_classes import DetectionBox
 from nuscenes.nuscenes import NuScenes
@@ -59,8 +48,7 @@ if __name__ == '__main__':
     meta = pickle.load(open('/home/kiennt/KienNT/research/data/nuScenes/pickle/mini/meta.pkl', 'rb'))
     plot_examples = 20
     conf_th=0.05
-    # print(meta)
-    # exit()
+
     cfg_path = '/home/kiennt/KienNT/research/Detectron3D/config/detection_cvpr_2019.json'
     for sample_token in sample_tokens:
         boxes = [item for item in data if item['sample_token']==sample_token]
@@ -70,7 +58,6 @@ if __name__ == '__main__':
             for ann in box['annotations']:
                 if meta['category_map'][ann['category'].split('.')[-1]]=='void':
                     continue
-                # r = ann['rotation']
                 rr = Quaternion(axis=[0, 0, 1], angle=ann['yaw_angle_rad'])
                 
                 box_real = sensor_coord_to_real_coord(
@@ -79,7 +66,6 @@ if __name__ == '__main__':
 
                 test_box = {
                     'sample_token': box['sample_token'],
-                    # 'translation': ann['xyz_in_meter'],
                     'translation': box_real.center,
                     'size': ann['box_size'],
                     'rotation': box_real.orientation.elements,
@@ -89,9 +75,7 @@ if __name__ == '__main__':
                     'attribute_name': ann['attribute'][0] if len(ann['attribute'])>0 else '',
                 }
                 test_boxes.append(test_box)
-        # if sample_token=='3e8750f331d7499e9b5123e9eb70f2e2':
-        #     print(len(test_boxes))
-        #     exit()
+
         result['results'][sample_token] = test_boxes
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

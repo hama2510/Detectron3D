@@ -76,7 +76,7 @@ class NusceneDatasetCenterNet(NusceneDataset):
                             )
                         )
                         box = boxes[0]
-                        box_2d = np.asarray(box["box_2d"], dtype=object) // stride
+                        # box_2d = np.asarray(box["box_2d"], dtype=object) // stride
                         rad = self.rotation_angle_to_pi_and_minus_pi(
                             box["yaw_angle_rad"]
                         )
@@ -90,7 +90,7 @@ class NusceneDatasetCenterNet(NusceneDataset):
                         attribute_target[y, x, :] = self.gen_attribute_onehot(
                             box["attribute"]
                         )
-                        offset_target[y, x, :] = self.offset([x, y], box_2d, stride)
+                        offset_target[y, x, :] = self.offset([x, y], box["box_2d"], stride)
                         depth_target[y, x, :] = box["xyz_in_sensor_coor"][2]
                         size_target[y, x, :] = box["box_size"]
                         rotation_target[y, x, :] = rad

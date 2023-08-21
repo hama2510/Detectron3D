@@ -39,13 +39,13 @@ class NpEncoder(json.JSONEncoder):
 #         img = cv.line(img, start_point, end_point, (0, 0, 255), 1)
 
 class Evaluation:
-    def __init__(self, dataset_name, dataroot, eval_config, verbose=False, output_dir='../tmp/'):
+    def __init__(self, dataset_name, dataroot, eval_config, verbose=False, ):
         self.nusc = NuScenes(version=dataset_name, dataroot=dataroot, verbose=verbose)
 #         if 'mini' in dataset_name:
 #             self.eval_set = 'mini_val'
         self.cfg_path = eval_config
-        self.output_dir = output_dir
-        self.result_path = os.path.join(self.output_dir, 'result_tmp.json')
+        # self.output_dir = output_dir
+        # self.result_path = os.path.join(self.output_dir, 'result_tmp.json')
         
     def dummy_box(self, sample_token):
         return {
@@ -59,10 +59,11 @@ class Evaluation:
                     'attribute_name': '',
                 }
     
-    def clear(self, ):
-         shutil.rmtree(self.output_dir) 
+    def clear(self, output_dir):
+         shutil.rmtree(output_dir) 
             
-    def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05):
+    def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05, output_dir='../tmp/'):
+        result_path = os.path.join(output_dir, 'result.json')
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
@@ -72,20 +73,20 @@ class Evaluation:
             if len(boxes) > 10000:
                 boxes = boxes[:10000]
             result['results'][sample_token] = boxes
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
             
-        out_file = open(self.result_path, "w")
+        out_file = open(result_path, "w")
         json.dump(result, out_file, cls=NpEncoder)
         out_file.close()
         
         with open(self.cfg_path, 'r') as _f:
             cfg_ = DetectionConfig.deserialize(json.load(_f))
-        nusc_eval = DetectionEval(self.nusc, config=cfg_, result_path=self.result_path, eval_set=eval_set, output_dir=self.output_dir, verbose=verbose)
+        nusc_eval = DetectionEval(self.nusc, config=cfg_, result_path=result_path, eval_set=eval_set, output_dir=output_dir, verbose=verbose)
         
         metrics, metric_data_list = nusc_eval.evaluate()
         metrics_summary = metrics.serialize()
-        with open(os.path.join(self.output_dir, 'metrics_summary.json'), 'w') as f:
+        with open(os.path.join(output_dir, 'metrics_summary.json'), 'w') as f:
             json.dump(metrics_summary, f, indent=2)
 
         if plot_examples > 0:
@@ -96,7 +97,7 @@ class Evaluation:
             sample_tokens = sample_tokens[:plot_examples]
 
             # Visualize samples.
-            example_dir = os.path.join(self.output_dir, 'examples')
+            example_dir = os.path.join(output_dir, 'examples')
             for sample_token in sample_tokens:
                 dir =  os.path.join(example_dir, sample_token)
                 os.makedirs(dir, exist_ok=True)
@@ -108,15 +109,11 @@ class Evaluation:
                                     nusc_eval.pred_boxes,
                                     conf_th=conf_th,
                                     eval_range=max(nusc_eval.cfg.class_range.values()),
-                                    savepath=os.path.join(dir, '{}.png'.format(sample_token)))
+                                    savepath=os.path.join(example_dir, '{}.png'.format(sample_token)))
                 except Exception as e:
                     print(e)
-                # items = [item for item in preds if item['sample_token']==sample_token]
-                # imgs = np.unique([item['img_path'] for item in items])
-                # for path in imgs:
-                #     img = cv.imread(path)
 
-        metrics_summary = json.load(open(os.path.join(self.output_dir, 'metrics_summary.json'), 'r'))
+        metrics_summary = json.load(open(os.path.join(output_dir, 'metrics_summary.json'), 'r'))
         if clear:
-            self.clear() 
+            self.clear(output_dir) 
         return metrics_summary

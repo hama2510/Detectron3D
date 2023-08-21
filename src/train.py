@@ -216,7 +216,7 @@ if __name__ == "__main__":
                         preds, eval_set="mini_val", verbose=False
                     )
                 else:
-                    metrics_summary = evaluation.evaluate(preds, verbose=False)
+                    metrics_summary = evaluation.evaluate(preds, verbose=False, plot_examples=20)
                 nds = metrics_summary["nd_score"]
             else:
                 metrics_summary = {}

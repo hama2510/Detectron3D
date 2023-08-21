@@ -75,7 +75,7 @@ class BaseTransformer:
         if self.config.num_workers <= 1:
             for pred in preds:
                 boxes.extend(
-                    self.transform_predict(pred, det_thres=self.config.demo.det_thres)
+                    self.transform_predict(pred, det_thres=self.config.demo.det_thres, topk=self.config.demo.topk)
                 )
         else:
             if not target:

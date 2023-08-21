@@ -19,8 +19,11 @@ class CenterNetTransformer(BaseTransformer):
             velocity_map = pred["pred"][key]["velocity"]
             pred_score = np.max(category_map, axis=2)
             indices = np.argwhere(pred_score > det_thres)
-
-            for idx in indices:
+            sorted_indices = indices[np.argsort(indices.sum(axis=1))]
+            if topk>0:
+                sorted_indices = sorted_indices[:topk]
+                
+            for idx in sorted_indices:
                 sc = pred_score[idx[0], idx[1]]
                 x, y = self.gen_coord_from_map(idx, offset_map, stride)
                 depth = np.exp(depth_map[idx[0]][idx[1], 0])
@@ -47,7 +50,7 @@ class CenterNetTransformer(BaseTransformer):
                 boxes.append(box)
         return boxes, calib_matrix
 
-    def transform_target(self, pred, det_thres=0.05):
+    def transform_target(self, pred, det_thres=0.05, topk=-1):
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]

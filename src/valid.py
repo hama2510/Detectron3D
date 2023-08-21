@@ -67,7 +67,7 @@ class Evaluation:
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
         for sample_token in sample_tokens:
-            boxes = [item[0] for item in preds if item['sample_token']==sample_token]
+            boxes = [item for item in preds if item['sample_token']==sample_token]
             boxes.sort(key=lambda x: x["detection_score"])
             if len(boxes) > 10000:
                 boxes = boxes[:10000]

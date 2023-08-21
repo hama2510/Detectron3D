@@ -106,6 +106,7 @@ if __name__ == "__main__":
     for model_id, item in enumerate(config.models):
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
+        model_config.model.save_dir = os.path.join(model_config.model.save_dir, model_config.model.exp)
         task = RunTask(model_config)
         tasks.append(task)
         logs.append(
@@ -233,7 +234,7 @@ if __name__ == "__main__":
             print(
                 "epoch={},model={},loss={},nds={:.2f}".format(
                     epoch,
-                    task.conf.model.model_name,
+                    task.conf.model.exp,
                     np.mean(logs[id]["loss"]["total"]),
                     nds,
                 )

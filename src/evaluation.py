@@ -71,8 +71,6 @@ class Evaluation:
             boxes.sort(key=lambda x: x["detection_score"])
             if len(boxes) > 10000:
                 boxes = boxes[:10000]
-#             if len(boxes)==0:
-#                 boxes = [self.dummy_box(sample_token)]
             result['results'][sample_token] = boxes
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)

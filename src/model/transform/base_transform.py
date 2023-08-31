@@ -86,7 +86,7 @@ class BaseTransformer:
             pool = Pool(self.config.num_workers)
             data = list(
                 pool.imap(
-                    partial(func, det_thres=self.config.demo.det_thres),
+                    partial(func, det_thres=self.config.demo.det_thres, topk=self.config.demo.topk),
                     preds,
                 )
             )

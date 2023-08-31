@@ -87,3 +87,57 @@ class CenterNet3DLoss(BaseLoss):
                 "centerness_loss": 0,
             }
         return total_loss, loss_log
+
+class CenterNet3DLossWithDcMask(CenterNet3DLoss):
+    def gen_mask(self, target):
+        target = torch.moveaxis(target, -1, 1)
+        masked = target.sum(axis=1)
+        masked = torch.clamp(masked, min=0, max=1)
+        return masked
+
+    def focal_loss(self, pred, target, mask, gamma=2, ):
+        pred, target = self.move_axis(pred, target)
+        pred = torch.clamp(pred, min=self.esp, max=1 - self.esp)
+
+        pred = pred*mask
+        target = target*mask
+
+        pos_inds = target.gt(0).float()
+        neg_inds = target.eq(0).float()
+
+        loss = 0
+
+        pos_loss = torch.log(pred) * torch.pow(1 - pred, gamma) * pos_inds
+        neg_loss = torch.log(1 - pred) * torch.pow(pred, gamma) * neg_inds
+
+        num_pos = pos_inds.float().sum()
+        pos_loss = pos_loss.sum()
+        neg_loss = neg_loss.sum()
+
+        if num_pos == 0:
+            loss = loss - neg_loss
+        else:
+            loss = loss - (pos_loss + neg_loss) / num_pos
+        return loss
+
+    def cross_entropy_loss(self, pred, target):
+        pred, target = self.move_axis(pred, target)
+        pred = torch.clamp(pred, min=self.esp, max=1 - self.esp)
+
+        pos_inds = target.gt(0).float()
+        neg_inds = target.eq(0).float()
+
+        loss = 0
+
+        pos_loss = torch.log(pred) * pos_inds
+        neg_loss = torch.log(1 - pred) * neg_inds
+
+        num_pos = pos_inds.float().sum()
+        pos_loss = pos_loss.sum()
+        neg_loss = neg_loss.sum()
+
+        if num_pos == 0:
+            loss = loss - neg_loss
+        else:
+            loss = loss - (pos_loss + neg_loss) / num_pos
+        return loss

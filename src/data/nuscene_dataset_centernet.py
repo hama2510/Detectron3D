@@ -81,7 +81,7 @@ class NusceneDatasetCenterNet(NusceneDataset):
                             box["yaw_angle_rad"]
                         )
 
-                        category_onehot = self.gen_category_onehot(box["category"])
+                        category_onehot = self.gen_category_onehot(box["category"], box['tag'])
                         if category_onehot is None:
                             # skip void objects
                             continue

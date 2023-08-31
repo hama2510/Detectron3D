@@ -160,14 +160,18 @@ class NusceneDataset(Dataset):
     def rotation_angle_to_pi_and_minus_pi(self, rotation_angle):
         return rotation_angle / 2.0 / np.pi
 
-    def gen_category_onehot(self, category):
+    def gen_category_onehot(self, category, tag=None):
         category = self.meta_data["category_map"][category.split(".")[-1]]
-        if category == "void":
-            return None
-        else:
-            onehot = np.zeros(len(self.meta_data["categories"]))
-            onehot[self.meta_data["categories"].index(category)] = 1
+        if tag=='dc':
+            onehot = np.zeros(len(self.meta_data["categories"])) -1
             return onehot
+        else:
+            if category == "void":
+                return None
+            else:
+                onehot = np.zeros(len(self.meta_data["categories"]))
+                onehot[self.meta_data["categories"].index(category)] = 1
+                return onehot
 
     def gen_attribute_onehot(self, attribute):
         onehot = np.zeros(len(self.meta_data["attributes"]))

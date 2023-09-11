@@ -64,7 +64,6 @@ class Evaluation:
             
     def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05, output_dir='../tmp/'):
         result_path = os.path.join(output_dir, 'result.json')
-        print(eval_set)
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}

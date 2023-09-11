@@ -33,21 +33,23 @@ class BaseLoss(nn.Module):
         neg_inds = target.eq(0).float()
 
         loss = 0
-        neg_weights = torch.pow(1 - target, 4)
+#         neg_weights = torch.pow(1 - target, 4)
         pos_loss = torch.log(pred) * torch.pow(1 - pred, gamma) * pos_inds
-        neg_loss = torch.log(1 - pred) * torch.pow(pred, gamma) * neg_weights * neg_inds
+        neg_loss = torch.log(1 - pred) * torch.pow(pred, gamma) * neg_inds
 
         num_pos = pos_inds.float().sum()
+        num_neg = neg_inds.float().sum()
         pos_loss = pos_loss.sum()
         neg_loss = neg_loss.sum()
 
         if num_pos == 0:
             loss = loss - neg_loss
         else:
-            loss = loss - (pos_loss + neg_loss) / num_pos
+#             loss = loss - (pos_loss + neg_loss) / num_pos
+            loss = loss - (pos_loss/num_pos + neg_loss/num_neg)
         return loss
 
-    def cross_entropy_loss(self, pred, target):
+    def cross_entropy_loss(self, pred, target, masked=True):
         pred, target = self.move_axis(pred, target)
         pred = torch.clamp(pred, min=self.esp, max=1 - self.esp)
 
@@ -66,7 +68,11 @@ class BaseLoss(nn.Module):
         if num_pos == 0:
             loss = loss - neg_loss
         else:
-            loss = loss - (pos_loss + neg_loss) / num_pos
+            if masked:
+                loss = loss - pos_loss / num_pos
+            else:
+                loss = loss - (pos_loss + neg_loss) / num_pos
+#                 loss = loss - (pos_loss/num_pos + neg_loss/num_neg)
         return loss
 
     def smooth_l1_loss(self, pred, target, masked):

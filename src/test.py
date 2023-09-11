@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
         if len(preds) > 0:
             if task.conf.data.dataset_name == "v1.0-mini":
-                eval_set="mini"
+                eval_set="mini_"
             else:
                 eval_set = ""
             if 'val.pkl' in task.conf.data.val:

@@ -212,14 +212,14 @@ if __name__ == "__main__":
             logs[id]["pred"] = []
             if len(preds) > 0:
                 if task.conf.data.dataset_name == "v1.0-mini":
-                    eval_set="mini"
+                    eval_set="mini_"
                 else:
                     eval_set = ""
                 if 'val.pkl' in task.conf.data.val:
                     eval_set+='val'
                 else:
                     eval_set+='train'
-                metrics_summary = evaluation.evaluate(preds, verbose=False, plot_examples=20, eval_set = eval_set)
+                metrics_summary = evaluation.evaluate(preds, verbose=False, eval_set = eval_set)
                 nds = metrics_summary["nd_score"]
             else:
                 metrics_summary = {}

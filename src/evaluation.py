@@ -64,14 +64,15 @@ class Evaluation:
             
     def evaluate(self, preds, eval_set='val', verbose=False, clear=True, plot_examples=0,conf_th=0.05, output_dir='../tmp/'):
         result_path = os.path.join(output_dir, 'result.json')
+        print(eval_set)
         gt_boxes = load_gt(self.nusc, eval_set, DetectionBox, verbose=verbose)
         sample_tokens = set(gt_boxes.sample_tokens)
         result = {"meta":{"use_camera":True},"results":{}}
         for sample_token in sample_tokens:
             boxes = [item for item in preds if item['sample_token']==sample_token]
             boxes.sort(key=lambda x: x["detection_score"])
-            if len(boxes) > 10000:
-                boxes = boxes[:10000]
+            if len(boxes) > 500:
+                boxes = boxes[:500]
             result['results'][sample_token] = boxes
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -99,8 +100,8 @@ class Evaluation:
             # Visualize samples.
             example_dir = os.path.join(output_dir, 'examples')
             for sample_token in sample_tokens:
-                dir =  os.path.join(example_dir, sample_token)
-                os.makedirs(dir, exist_ok=True)
+#                 dir =  os.path.join(example_dir, sample_token)
+                os.makedirs(example_dir, exist_ok=True)
 
                 try:
                     visualize_sample(self.nusc,

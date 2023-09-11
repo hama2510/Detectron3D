@@ -93,7 +93,6 @@ class MyNuScenes(NuScenes):
                 box, cam_intrinsic, imsize, vis_level=box_vis_level
             ):
                 continue
-
             box_list.append([box, yaw])
 
         return data_path, box_list, cam_intrinsic
@@ -150,16 +149,17 @@ class NuScenesLoader:
                 )
                 if len(boxes) > 0:
                     sample_data_token = sample["data"][cam]
-                    # data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample_data_token, selected_anntokens=[ann_token])
+#                     data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample_data_token, selected_anntokens=[ann_token])
                     ann_metadata = self.nusc.get("sample_annotation", ann_token)
                     assert len(ann_metadata["attribute_tokens"]) <= 1
-
+                    
                     if not data_path in data.keys():
                         data[data_path] = {
                             "anns": [],
                             "calibration_matrix": self.read_sensor(sample_data_token),
                         }
-                    for i, box, yaw in enumerate(boxes):
+                    for i, item in enumerate(boxes):
+                        box, yaw = item
                         if i == 0:
                             tag = "pos"
                         else:

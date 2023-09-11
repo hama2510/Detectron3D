@@ -38,6 +38,7 @@ if __name__ == "__main__":
     dataset = get_dataset(config.data.data_loader)
 
     dataset_val = dataset(config.data.val, config=config, return_target=True)
+#     dataset_val = dataset(config.data.train, config=config, return_target=True)
     dataloader_val = DataLoader(
         dataset_val,
         batch_size=config.train.batch_size,
@@ -54,6 +55,7 @@ if __name__ == "__main__":
     for model_id, item in enumerate(config.models):
         model_config = config.copy()
         model_config.model = model_config.models[model_id]
+        model_config.model.save_dir = os.path.join(model_config.model.save_dir, model_config.model.exp)
         task = RunTask(model_config)
         tasks.append(task)
         logs.append(
@@ -104,23 +106,23 @@ if __name__ == "__main__":
         preds = task.transformer.transform_predicts(logs[id]["pred"], target=True)
 
         if len(preds) > 0:
+            
             if task.conf.data.dataset_name == "v1.0-mini":
-                metrics_summary = evaluation.evaluate(
-                    preds,
-                    eval_set="mini_val",
-                    verbose=False,
-                    clear=False,
-                    output_dir=task.conf.model.save_dir,
-                    plot_examples=10
-                )
+                eval_set="mini_val"
             else:
-                metrics_summary = evaluation.evaluate(
-                    preds,
-                    verbose=False,
-                    clear=False,
-                    output_dir=task.conf.model.save_dir,
-                    plot_examples=10
-                )
+                eval_set = 'val'
+#             if task.conf.data.dataset_name == "v1.0-mini":
+#                 eval_set="mini_train"
+#             else:
+#                 eval_set = 'train'
+            metrics_summary = evaluation.evaluate(
+                preds,
+                verbose=False,
+                clear=False,
+                eval_set = eval_set,
+                output_dir=task.conf.model.save_dir,
+                plot_examples=10
+            )
             nds = metrics_summary["nd_score"]
         else:
             metrics_summary = {}

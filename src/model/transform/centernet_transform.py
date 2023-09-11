@@ -22,7 +22,6 @@ class CenterNetTransformer(BaseTransformer):
             sorted_indices = indices[np.argsort(indices.sum(axis=1))]
             if topk>0:
                 sorted_indices = sorted_indices[:topk]
-                
             for idx in sorted_indices:
                 sc = pred_score[idx[0], idx[1]]
                 x, y = self.gen_coord_from_map(idx, offset_map, stride)

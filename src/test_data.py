@@ -37,19 +37,20 @@ class NpEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 if __name__ == '__main__':
-    nusc = NuScenes(version='v1.0-mini', dataroot='/home/kiennt/KienNT/research/data/nuScenes/', verbose=False)
-    data = pickle.load(open('/home/kiennt/KienNT/research/data/nuScenes/pickle/mini/val.pkl', 'rb'))
+    nusc = NuScenes(version='v1.0-trainval', dataroot='../../data/nuScenes/', verbose=False)
+    data = pickle.load(open('../../data/nuScenes/pickle/train-val/val.pkl', 'rb'))
     result = {"meta":{"use_camera":True},"results":{}}
-    eval_set = 'mini_val'
+#     eval_set = 'mini_val'
+    eval_set = 'val'
     gt_boxes = load_gt(nusc, eval_set, DetectionBox, verbose=False)
     sample_tokens = set(gt_boxes.sample_tokens)
-    output_dir = '/home/kiennt/KienNT/research/test_result'
+    output_dir = '../../test_result'
     result_path = os.path.join(output_dir, 'result_tmp.json')
-    meta = pickle.load(open('/home/kiennt/KienNT/research/data/nuScenes/pickle/mini/meta.pkl', 'rb'))
+    meta = pickle.load(open('../../data/nuScenes/pickle/train-val/meta.pkl', 'rb'))
     plot_examples = 20
     conf_th=0.05
 
-    cfg_path = '/home/kiennt/KienNT/research/Detectron3D/config/detection_cvpr_2019.json'
+    cfg_path = '../config/detection_cvpr_2019.json'
     for sample_token in sample_tokens:
         boxes = [item for item in data if item['sample_token']==sample_token]
         
@@ -87,7 +88,10 @@ if __name__ == '__main__':
     with open(cfg_path, 'r') as _f:
         cfg_ = DetectionConfig.deserialize(json.load(_f))
     nusc_eval = DetectionEval(nusc, config=cfg_, result_path=result_path, eval_set=eval_set, output_dir=output_dir, verbose=False)
-    
+    metrics, metric_data_list = nusc_eval.evaluate()
+    metrics_summary = metrics.serialize()
+    with open(os.path.join(output_dir, 'metrics_summary.json'), 'w') as f:
+        json.dump(metrics_summary, f, indent=2)
     if plot_examples > 0:
         # Select a random but fixed subset to plot.
         random.seed(42)
@@ -107,7 +111,4 @@ if __name__ == '__main__':
                                 eval_range=max(nusc_eval.cfg.class_range.values()),
                                 savepath=os.path.join(example_dir, '{}.png'.format(sample_token)))
             
-    metrics, metric_data_list = nusc_eval.evaluate()
-    metrics_summary = metrics.serialize()
-    with open(os.path.join(output_dir, 'metrics_summary.json'), 'w') as f:
-        json.dump(metrics_summary, f, indent=2)
+    

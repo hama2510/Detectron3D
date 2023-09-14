@@ -122,7 +122,7 @@ if __name__ == "__main__":
     for epoch in range(1, config.train.epochs + 1):
         # train
         print("Training ...")
-        #         for step, samples in enumerate(dataloader_train):
+#                 for step, samples in enumerate(dataloader_train):
         for task_id in range(0, len(tasks)):
             tasks[task_id].model.train()
         with tqdm(dataloader_train, desc="Train") as tepoch:

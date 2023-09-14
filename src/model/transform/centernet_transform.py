@@ -18,11 +18,15 @@ class CenterNetTransformer(BaseTransformer):
             rotation_map = pred["pred"][key]["rotation"]
             velocity_map = pred["pred"][key]["velocity"]
             pred_score = np.max(category_map, axis=2)
-            indices = np.argwhere(pred_score > det_thres)
-            sorted_indices = indices[np.argsort(indices.sum(axis=1))]
-            if topk>0:
+            mask = pred_score > det_thres
+            filtered_pred_score = pred_score[mask]
+            sorted_indices = np.argsort(filtered_pred_score)[::-1]
+            if topk > 0:
                 sorted_indices = sorted_indices[:topk]
-            for idx in sorted_indices:
+            row_indices, col_indices = np.where(mask)
+            top_k_row_indices = row_indices[sorted_indices]
+            top_k_col_indices = col_indices[sorted_indices]
+            for idx in zip(top_k_row_indices, top_k_col_indices):
                 sc = pred_score[idx[0], idx[1]]
                 x, y = self.gen_coord_from_map(idx, offset_map, stride)
                 depth = np.exp(depth_map[idx[0]][idx[1], 0])

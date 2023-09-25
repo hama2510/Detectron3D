@@ -6,19 +6,17 @@ import numpy as np
 
 sys.path.append("..")
 from utils.camera import *
-from .nuscene_dataset import *
+from .nuscene_dataset_centernet import *
 
 STRIDE_LIST = [16]
 M_LIST = [0, np.inf]
 RADIUS = 1.5
 
 
-class NusceneDatasetCenterNet(NusceneDataset):
-    def __init__(self, data_file, config, return_target=True):
-        super().__init__(data_file, config, return_target)
-        self.stride_list = STRIDE_LIST
-        self.m_list = M_LIST
-        self.radius = RADIUS
+class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
+
+    def gen_depth(self, depth):
+        pass
 
     def gen_target(self, anns, img_shape, stride):
         shape = [
@@ -60,7 +58,6 @@ class NusceneDatasetCenterNet(NusceneDataset):
                         pass_cond = pass_cond and is_valid_box(
                             box_2d, (img_shape[1], img_shape[0])
                         )
-                        pass_cond = pass_cond and self.is_close_box(ann["xyz_in_sensor_coor"][2])
                         if pass_cond:
                             new_ann = ann.copy()
                             new_ann["box_2d"] = box_2d

@@ -149,10 +149,10 @@ class NuScenesLoader:
                 )
                 if len(boxes) > 0:
                     sample_data_token = sample["data"][cam]
-#                     data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample_data_token, selected_anntokens=[ann_token])
+                    #                     data_path, boxes, camera_intrinsic = self.nusc.get_sample_data(sample_data_token, selected_anntokens=[ann_token])
                     ann_metadata = self.nusc.get("sample_annotation", ann_token)
                     assert len(ann_metadata["attribute_tokens"]) <= 1
-                    
+
                     if not data_path in data.keys():
                         data[data_path] = {
                             "anns": [],
@@ -258,6 +258,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataroot", type=str, help="datset root")
     parser.add_argument("--num_worker", type=int, default=16)
     parser.add_argument("--out", type=str, help="out file folder")
+    parser.add_argument("--tiny", default=False, help="", action='store_true')
     args = parser.parse_args()
 
     if not os.path.exists(args.out):
@@ -280,10 +281,23 @@ if __name__ == "__main__":
         train_key = "train"
         val_key = "val"
 
-    train_scenes = [item for item in scenes if item["name"] in splits[train_key]]
-    if args.dataset == "v1.1-mini":
-        train_scenes = [item for item in train_scences if item != "scene-0553"]
-    val_scenes = [item for item in scenes if item["name"] in splits[val_key]]
+    if not args.tiny:
+        train_scenes = [item for item in scenes if item["name"] in splits[train_key]]
+        if args.dataset == "v1.1-mini":
+            train_scenes = [item for item in train_scences if item != "scene-0553"]
+        val_scenes = [item for item in scenes if item["name"] in splits[val_key]]
+    else:
+        train_scenes = [
+            item
+            for item in scenes
+            if item["name"] in splits["mini_train"]
+            and item["name"] in splits["train"]
+        ]
+        val_scenes = [
+            item
+            for item in scenes
+            if item["name"] in splits["mini_val"] and not item["name"] in splits["train"]
+        ]
 
     for scene in tqdm(train_scenes):
         # print('Hanlding scene %s'%scene['name'])

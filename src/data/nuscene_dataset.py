@@ -142,6 +142,12 @@ class NusceneDataset(Dataset):
                 )
         return sample
 
+    def is_close_box(self, depth):
+        if depth<=50:
+            return True
+        else:
+            return False
+
     #     def rotation_angle_to_pi_and_bin(self, rotation_angle):
     #         rad, bin = rotation_angle/np.pi, np.max([0, int(np.sign(rotation_angle))])
     #         dir_cls = np.zeros(2)

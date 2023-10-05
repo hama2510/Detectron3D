@@ -38,7 +38,7 @@ class PredictionHead(nn.Module):
         self.convs = nn.Sequential(*conv_list)
 
     def forward(self, x):
-        x = self.self.convs(x)
+        x = self.convs(x)
         return x
 
 class ClassificationHead(nn.Module):

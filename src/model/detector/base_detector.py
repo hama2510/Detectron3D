@@ -58,7 +58,7 @@ class BaseDetector(nn.Module):
             )
         elif self.config.model.backbone_name == "efficientnet_v2_s":
             model = detector(
-                feature_extractor=EfficientNetV2S(),
+                feature_extractor=EfficientNetV2S(self.config.device, pretrained=True),
                 num_cate=len(self.meta_data["categories"]),
                 num_attr=len(self.meta_data["attributes"]),
             )

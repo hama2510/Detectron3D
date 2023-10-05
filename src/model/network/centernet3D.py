@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from model.module.fpn import FPN
+from model.module.fpn import FPN, FusedFPN, FusedFPNP3
 from collections import OrderedDict
-from .fcos3d import PredictionHead
+# from .fcos3d import PredictionHead
 
 class CenterNet3D(nn.Module):
     def __init__(self, feature_extractor, num_cate, num_attr):
         super().__init__()
         self.feature_extractor = feature_extractor
-        self.fpn = FPN(self.feature_extractor.channel_num, 256)
+        self.fpn = FusedFPN(self.feature_extractor.channel_num, 256)
         self.cls_head = ClassificationHead(256, num_cate, num_attr, (3,3), 1, 4)
         self.regress_head = RegressionHead(256, (3,3), 1, 4)
 
@@ -27,6 +27,20 @@ class CenterNet3D(nn.Module):
                 outs[key][k] = x_regress[k]
         return outs
     
+class PredictionHead(nn.Module):
+    def __init__(self, in_channel, kernel_size, padding, num_conv):
+        super().__init__()
+        self.num_conv = num_conv
+        conv_list = []
+        for i in range(self.num_conv):
+            conv_list.append(nn.Conv2d(in_channel, in_channel, kernel_size, padding=padding))
+            conv_list.append(nn.ReLU())
+        self.convs = nn.Sequential(*conv_list)
+
+    def forward(self, x):
+        x = self.self.convs(x)
+        return x
+
 class ClassificationHead(nn.Module):
     def __init__(self, in_channel, num_cate, num_attr, kernel_size, padding, num_conv):
         super().__init__()

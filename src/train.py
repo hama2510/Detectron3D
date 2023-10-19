@@ -30,6 +30,7 @@ class RunTask:
     def __init__(self, conf):
         self.conf = conf
         self.model = self.init_model()
+        self.model = self.model.to(conf.device)
         self.optimizer = self.init_optimizer()
         self.criterion = self.init_criterion()
         self.transformer = self.init_transformer()

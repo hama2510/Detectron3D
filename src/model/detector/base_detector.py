@@ -6,6 +6,7 @@ from model.module.mobilenet_v2 import MobileNetv2
 from model.module.resnet101 import ResNet101
 from model.module.resnet101_deformable import ResNet101DCN
 from model.module.efficientnet_v2 import EfficientNetV2S
+from model.module.convnext import ConvNextModel
 import pickle
 from collections import OrderedDict
 
@@ -57,6 +58,12 @@ class BaseDetector(nn.Module):
                 num_attr=len(self.meta_data["attributes"]),
             )
         elif self.config.model.backbone_name == "efficientnet_v2_s":
+            model = detector(
+                feature_extractor=ConvNextModel(self.config.device),
+                num_cate=len(self.meta_data["categories"]),
+                num_attr=len(self.meta_data["attributes"]),
+            )
+        elif self.config.model.backbone_name == "convnext":
             model = detector(
                 feature_extractor=EfficientNetV2S(self.config.device, pretrained=True),
                 num_cate=len(self.meta_data["categories"]),

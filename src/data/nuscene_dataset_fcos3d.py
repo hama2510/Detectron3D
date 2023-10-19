@@ -113,13 +113,13 @@ class NusceneDatasetFCOS3D(NusceneDataset):
                         velocity_target[y, x, :] = self.gen_velocity(box["velocity"])
 
         return {
-            "category": torch.FloatTensor(category_target),
-            "attribute": torch.FloatTensor(attribute_target),
-            "centerness": torch.FloatTensor(centerness_target),
-            "offset": torch.FloatTensor(offset_target),
-            "depth": torch.FloatTensor(depth_target),
-            "size": torch.FloatTensor(size_target),
-            "rotation": torch.FloatTensor(rotation_target),
-            "dir": torch.FloatTensor(dir_target),
-            "velocity": torch.FloatTensor(velocity_target),
+            "category": category_target,
+            "attribute": attribute_target,
+            "centerness": centerness_target,
+            "offset": offset_target,
+            "depth": depth_target,
+            "size": size_target,
+            "rotation": rotation_target,
+            "dir": dir_target,
+            "velocity": velocity_target,
         }

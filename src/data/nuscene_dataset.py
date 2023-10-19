@@ -94,6 +94,9 @@ def is_positive_location(point, box, stride, radius):
     else:
         return False
 
+def flip_2d_array_horizontally(arr):
+    flipped_array = [row[::-1] for row in arr]
+    return np.array(flipped_array)
 
 class NusceneDataset(Dataset):
     def __init__(self, data_file, config, return_target=True):
@@ -109,16 +112,33 @@ class NusceneDataset(Dataset):
         self.return_target = return_target
         self.resize = config.data.resize
         self.rotation_encode = config.data.rotation_encode
+        self.aug_config = config.data.aug
+        self.aug = config.data.aug.copy()
 
     def __len__(self):
         return len(self.data)
+
+    def aug_data(self, img, targets):
+        if 'flip' in self.aug_config.keys():
+            rand = np.random.rand()
+            if rand<self.aug_config.flip.rate:
+                img = cv.flip(img, 1)
+                for stride in targets.keys():
+                    for key in targets[stride].keys():
+                        targets[stride][key] = flip_2d_array_horizontally(targets[stride][key])
+        return img, targets
+
+    def to_float_tensor(self, targets):
+        for stride in targets.keys():
+            for key in targets[stride].keys():
+                targets[stride][key] = torch.FloatTensor(targets[stride][key])
+        return targets
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
         item = self.data[idx]
-        #         img = cv.imread(self.image_root+item['image'])
         img = cv.imread(item["image"])
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         img = cv.resize(
@@ -126,20 +146,25 @@ class NusceneDataset(Dataset):
         )
         shape = [img.shape[0], img.shape[1]]
         raw_img = img.copy()
+        
+        targets = {}
+        if self.return_target:
+            for stride in self.stride_list:
+                targets["{}".format(stride)] = self.gen_target(
+                    item["annotations"], shape, stride
+                )
+
+        img, targets = self.aug_data(img, targets)
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
+        targets = self.to_float_tensor(targets)
         sample = {
             "sample_token": item["sample_token"],
             "calibration_matrix": item["calibration_matrix"],
             "img_path": item["image"],
             "img": img,
             # "raw_img": raw_img,
-            "target": {},
+            "target": targets,
         }
-        if self.return_target:
-            for stride in self.stride_list:
-                sample["target"]["{}".format(stride)] = self.gen_target(
-                    item["annotations"], shape, stride
-                )
         return sample
 
     def is_close_box(self, depth):

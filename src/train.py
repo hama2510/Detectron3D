@@ -112,7 +112,8 @@ if __name__ == "__main__":
         logs.append(
             {
                 "pred": [],
-                "best_score": 0,
+                "best_nds": 0,
+                "best_mAP": 0,
                 "loss": logger.init_loss_log(),
                 "val_loss": logger.init_loss_log(),
             }
@@ -221,6 +222,7 @@ if __name__ == "__main__":
                     eval_set+='train'
                 metrics_summary = evaluation.evaluate(preds, verbose=False, eval_set = eval_set)
                 nds = metrics_summary["nd_score"]
+                mAP = metrics_summary["mean_ap"]
             else:
                 metrics_summary = {}
                 nds = 0
@@ -251,7 +253,7 @@ if __name__ == "__main__":
             logs[id]["val_loss"] = logger.init_loss_log()
 
             if task.conf.train.save_best:
-                if nds > logs[id]["best_score"]:
+                if nds > logs[id]["best_nds"] or mAP>logs[id]["best_mAP"]:
                     task.model.save_model(
                         os.path.join(
                             task.conf.model.save_dir,
@@ -265,7 +267,9 @@ if __name__ == "__main__":
                         "model_{}.pth".format(epoch),
                     )
                 )
-            if nds > logs[id]["best_score"]:
-                logs[id]["best_score"] = nds
+            if nds > logs[id]["best_nds"]:
+                logs[id]["best_nds"] = nds
+            if mAP > logs[id]["best_mAP"]:
+                logs[id]["best_mAP"] = mAP
             del task
         print(datetime.now() - start)

@@ -6,8 +6,8 @@ class SeparableConv(torch.nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1):
         super(SeparableConv, self).__init__()
         padding = kernel_size//2
-        self.conv1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=kernel_size, stride=1, padding=padding)
-        self.conv2 = torch.nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=stride, padding=0)
+        self.conv1 = torch.nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+        self.conv2 = torch.nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -38,15 +38,15 @@ class ConvNextModel(torch.nn.Module):
 
     def __init__(self, **kwargs):
         super(ConvNextModel, self).__init__()
-        self.conv = SeparableConv(in_channels=3, out_channels=96, kernel_size=3, stride=4)
-        self.block1 = self.convnext_block(num=3, in_channels=96)
-        self.down_conv1 = SeparableConv(in_channels=96, out_channels=192, kernel_size=3, stride=2)
-        self.block2 = self.convnext_block(num=3, in_channels=192)
-        self.down_conv2 = SeparableConv(in_channels=192, out_channels=384, kernel_size=3, stride=2)
-        self.block3 = self.convnext_block(num=9, in_channels=384)
-        self.down_conv3 = SeparableConv(in_channels=384, out_channels=768, kernel_size=3, stride=2)
-        self.block4 = self.convnext_block(num=3, in_channels=768)
-        self.channel_num = [192, 384, 768]
+        self.conv = SeparableConv(in_channels=3, out_channels=32, kernel_size=3, stride=4)
+        self.block1 = self.convnext_block(num=3, in_channels=32)
+        self.down_conv1 = SeparableConv(in_channels=32, out_channels=64, kernel_size=3, stride=2)
+        self.block2 = self.convnext_block(num=3, in_channels=64)
+        self.down_conv2 = SeparableConv(in_channels=64, out_channels=128, kernel_size=3, stride=2)
+        self.block3 = self.convnext_block(num=9, in_channels=128)
+        self.down_conv3 = SeparableConv(in_channels=128, out_channels=256, kernel_size=3, stride=2)
+        self.block4 = self.convnext_block(num=3, in_channels=256)
+        self.channel_num = [64, 128, 256]
 
     def convnext_block(self, num, in_channels):
         layers = [ConvNext(in_channels) for i in range(num)]

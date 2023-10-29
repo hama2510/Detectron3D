@@ -89,7 +89,7 @@ if __name__ == "__main__":
         shuffle=True,
         num_workers=config.num_workers,
     )
-    dataset_val = dataset(config.data.val, config=config, return_target=True)
+    dataset_val = dataset(config.data.val, config=config, return_target=True, is_train=False)
     dataloader_val = DataLoader(
         dataset_val,
         batch_size=config.train.batch_size,

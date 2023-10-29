@@ -14,8 +14,8 @@ RADIUS = 1.5
 
 
 class NusceneDatasetCenterNet(NusceneDataset):
-    def __init__(self, data_file, config, return_target=True):
-        super().__init__(data_file, config, return_target)
+    def __init__(self, data_file, config, return_target=True, is_train=True):
+        super().__init__(data_file, config, return_target=return_target, is_train=is_train)
         self.stride_list = STRIDE_LIST
         self.m_list = M_LIST
         self.radius = RADIUS

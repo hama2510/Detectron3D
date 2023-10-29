@@ -99,7 +99,7 @@ def flip_2d_array_horizontally(arr):
     return np.array(flipped_array)
 
 class NusceneDataset(Dataset):
-    def __init__(self, data_file, config, return_target=True):
+    def __init__(self, data_file, config, return_target=True, is_train=True):
         self.transformed = config.data.transformed
         self.image_root = config.data.image_root
         if not self.image_root.endswith("/"):
@@ -114,6 +114,7 @@ class NusceneDataset(Dataset):
         self.rotation_encode = config.data.rotation_encode
         self.aug_config = config.data.aug
         self.aug = config.data.aug.copy()
+        self.is_train = is_train
 
     def __len__(self):
         return len(self.data)
@@ -153,8 +154,8 @@ class NusceneDataset(Dataset):
                 targets["{}".format(stride)] = self.gen_target(
                     item["annotations"], shape, stride
                 )
-
-        img, targets = self.aug_data(img, targets)
+        if self.is_train:
+            img, targets = self.aug_data(img, targets)
         img = transforms.Compose([transforms.ToTensor()])(img.copy())
         targets = self.to_float_tensor(targets)
         sample = {

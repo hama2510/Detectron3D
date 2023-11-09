@@ -19,7 +19,7 @@ class CenterNet3DLoss(BaseLoss):
 
         offset_loss = self.smooth_l1_loss(pred["offset"], target["offset"], masked)
         depth_loss = self.smooth_l1_loss(
-            torch.exp(pred["depth"]), target["depth"], masked
+            torch.exp(pred["depth"]), target["depth"]
         )
         size_loss = self.smooth_l1_loss(pred["size"], target["size"], masked)
         rotation_loss = self.smooth_l1_loss(

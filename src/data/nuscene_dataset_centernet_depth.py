@@ -23,7 +23,7 @@ class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
         idx = np.max([0, idx])
         onehot = np.zeros(num)
         onehot[idx] = 1
-        return 
+        return onehot
 
     def gen_target(self, anns, img_shape, stride):
         shape = [

@@ -168,8 +168,8 @@ class NusceneDataset(Dataset):
         }
         return sample
 
-    def is_close_box(self, depth):
-        if depth<=50:
+    def is_close_box(self, depth, thres=50):
+        if depth<=thres:
             return True
         else:
             return False

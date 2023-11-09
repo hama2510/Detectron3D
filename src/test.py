@@ -37,7 +37,7 @@ if __name__ == "__main__":
     config = OmegaConf.load(args.config)
     dataset = get_dataset(config.data.data_loader)
     
-    dataset_val = dataset(config.data.val, config=config, return_target=True)
+    dataset_val = dataset(config.data.val, config=config, return_target=True, is_train=False)
     dataloader_val = DataLoader(
         dataset_val,
         batch_size=config.train.batch_size,

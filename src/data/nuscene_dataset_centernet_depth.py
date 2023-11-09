@@ -11,12 +11,16 @@ from .nuscene_dataset_centernet import *
 STRIDE_LIST = [16]
 M_LIST = [0, np.inf]
 RADIUS = 1.5
+DEPTH_THRES = 50
 
 
 class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
 
-    def gen_depth(self, depth):
-        pass
+    def gen_depth(self, depth, num=50):
+        idx = int(depth//num)
+        onehot = np.zeros((50))
+        onehot[idx] = 1
+        return 
 
     def gen_target(self, anns, img_shape, stride):
         shape = [
@@ -30,7 +34,7 @@ class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
             (shape[0], shape[1], len(self.meta_data["attributes"]))
         )
         offset_target = np.zeros((shape[0], shape[1], 2))
-        depth_target = np.zeros((shape[0], shape[1], 1))
+        depth_target = np.zeros((shape[0], shape[1], 50))
         size_target = np.zeros((shape[0], shape[1], 3))
         rotation_target = np.zeros((shape[0], shape[1], 1))
         velocity_target = np.zeros((shape[0], shape[1], 2))
@@ -58,6 +62,7 @@ class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
                         pass_cond = pass_cond and is_valid_box(
                             box_2d, (img_shape[1], img_shape[0])
                         )
+                        pass_cond = pass_cond and self.is_close_box(ann["xyz_in_sensor_coor"][2], thres=DEPTH_THRES)
                         if pass_cond:
                             new_ann = ann.copy()
                             new_ann["box_2d"] = box_2d
@@ -89,17 +94,17 @@ class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
                             box["attribute"]
                         )
                         offset_target[y, x, :] = self.offset([x, y], box["box_2d"], stride)
-                        depth_target[y, x, :] = box["xyz_in_sensor_coor"][2]
+                        depth_target[y, x, :] = self.gen_depth(box["xyz_in_sensor_coor"][2], num=DEPTH_THRES)
                         size_target[y, x, :] = box["box_size"]
                         rotation_target[y, x, :] = rad
                         velocity_target[y, x, :] = self.gen_velocity(box["velocity"])
 
         return {
-            "category": torch.FloatTensor(category_target),
-            "attribute": torch.FloatTensor(attribute_target),
-            "offset": torch.FloatTensor(offset_target),
-            "depth": torch.FloatTensor(depth_target),
-            "size": torch.FloatTensor(size_target),
-            "rotation": torch.FloatTensor(rotation_target),
-            "velocity": torch.FloatTensor(velocity_target),
+            "category": category_target,
+            "attribute": attribute_target,
+            "offset": offset_target,
+            "depth": depth_target,
+            "size": size_target,
+            "rotation": rotation_target,
+            "velocity": velocity_target,
         }

@@ -47,20 +47,19 @@ class CenterNetTransformerDepth(CenterNetTransformer):
 
             for idx, sc in score_list:
                 x, y = self.gen_coord_from_map(idx, offset_map, stride)
-                depth = np.argmax(depth_map[idx[0]][idx[1], :])
+#                 depth = np.argmax(depth_map[idx[0]][idx[1], :])
                 size = np.clip(size_map[idx[0], idx[1], :], a_min=1e-4, a_max=None)
 
                 if self.config.data.rotation_encode == "pi_and_minus_pi":
                     rotation = rotation_map[idx[0], idx[1], 0] * np.pi * 2.0
                 else:
                     raise ValueError('Not support other than pi_and_minus_pi')
-
                 box = self.gen_box(
                     sample_token,
                     calib_matrix,
                     img_path,
                     [x, y],
-                    depth,
+                    np.argmax(depth_map[idx[0]][idx[1], :])+1,
                     rotation,
                     size,
                     np.argmax(category_map[idx[0], idx[1], :]),

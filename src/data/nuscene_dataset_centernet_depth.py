@@ -12,13 +12,16 @@ STRIDE_LIST = [16]
 M_LIST = [0, np.inf]
 RADIUS = 1.5
 DEPTH_THRES = 50
+NUM_DEPTH = 50
 
 
 class NusceneDatasetCenterNetDepth(NusceneDatasetCenterNet):
 
-    def gen_depth(self, depth, num=50):
-        idx = int(depth//num)
-        onehot = np.zeros((50))
+    def gen_depth(self, depth, num=50, r=50):
+        n = r//num
+        idx = int(depth//n)-1
+        idx = np.max([0, idx])
+        onehot = np.zeros(num)
         onehot[idx] = 1
         return 
 

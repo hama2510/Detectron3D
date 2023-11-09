@@ -56,7 +56,7 @@ class CenterNet3DLoss(BaseLoss):
                 + attribute_loss
                 + (
                     offset_loss
-                    + 0.2 * depth_loss
+                    + depth_loss
                     + size_loss
                     + rotation_loss
                     + 0.05 * velocity_loss

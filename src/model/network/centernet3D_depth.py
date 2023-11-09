@@ -54,8 +54,8 @@ class ClassificationHead(nn.Module):
         x = self.convs(x)
         outs = OrderedDict()
         outs['category'] = self.conv_cate(x).sigmoid()
-        outs['attribute'] = self.conv_attr(x).sigmoid()
-        outs['depth'] = self.conv_depth(x).sigmoid()
+        outs['attribute'] = torch.nn.functional.softmax(self.conv_attr(x).sigmoid(), dim=1)
+        outs['depth'] = torch.nn.functional.softmax(self.conv_depth(x), dim=1)
         return outs
 
 class RegressionHead(nn.Module):

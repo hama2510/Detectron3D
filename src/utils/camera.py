@@ -1,11 +1,7 @@
 import cv2 as cv
-import os
 from pyquaternion import Quaternion
-# from scipy.spatial.transform import Rotation as quaternion_transformer
 import numpy as np
-from nuscenes.utils.geometry_utils import view_points
 from nuscenes.utils.data_classes import Box
-from nuscenes.eval.common.utils import angle_diff, quaternion_yaw
 
 def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=True):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = np.array(intrinsic), np.array(sensor_R), np.array(sensor_t), np.array(ego_R), np.array(ego_t)
@@ -28,8 +24,11 @@ def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrat
     else:
         return intrinsic
 
-def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True):
+def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True, yaw_only=False):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
+    if yaw_only:
+        sensor_R = Quaternion(axis=[0,0,1], angle=Quaternion(matrix=sensor_R).yaw_pitch_roll[0]).rotation_matrix
+        ego_R = Quaternion(axis=[0,0,1], angle=Quaternion(matrix=ego_R).yaw_pitch_roll[0]).rotation_matrix
     coord_3d = np.array(coord_3d)
     coord_3d = np.append(coord_3d, 1)
     
@@ -39,9 +38,24 @@ def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True):
         coord_2d = intrinsic @ coord_3d
     else:
         intrinsic, sensor_extrinsic, ego_extrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
-        coord_2d = intrinsic @ sensor_extrinsic @ ego_extrinsic @ coord_3d
+        coord_2d = intrinsic @ (sensor_extrinsic @ (ego_extrinsic @ coord_3d))
     coord_2d = (coord_2d / coord_2d[[-2]])[:2].T.astype(int)
     return coord_2d
+
+# def coord_3d_to_2d_by_yaw(coord_3d, calibration_matrix, calibrated=True):
+#     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
+#     coord_3d = np.array(coord_3d)
+#     coord_3d = np.append(coord_3d, 1)
+    
+#     # no need extrinsic matrix because the coordinate has been rotated and translated
+#     if calibrated:
+#         intrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
+#         coord_2d = intrinsic @ coord_3d
+#     else:
+#         intrinsic, sensor_extrinsic, ego_extrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
+#         coord_2d = intrinsic @ sensor_extrinsic @ ego_extrinsic @ coord_3d
+#     coord_2d = (coord_2d / coord_2d[[-2]])[:2].T.astype(int)
+#     return coord_2d
 
 def box_3d_to_2d(box, calibration_matrix, calibrated=True):
     c = coord_3d_to_2d(box.center, calibration_matrix)

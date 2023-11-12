@@ -52,7 +52,7 @@ class BaseLoss(nn.Module):
     def cross_entropy_loss(self, pred, target, masked=True):
         pred, target = self.move_axis(pred, target)
         pred = torch.clamp(pred, min=self.esp, max=1 - self.esp)
-
+        # print(pred.shape)
         pos_inds = target.eq(1).float()
         neg_inds = target.eq(0).float()
 
@@ -61,6 +61,7 @@ class BaseLoss(nn.Module):
         pos_loss = torch.log(pred) * pos_inds
         neg_loss = torch.log(1 - pred) * neg_inds
 
+        # print(pred[[0],:,[0],[0]])
         num_pos = pos_inds.float().sum()
         pos_loss = pos_loss.sum()
         neg_loss = neg_loss.sum()

@@ -32,7 +32,7 @@ if __name__ == "__main__":
         params = np.round(params / 1000000, 2)
 
         output = model(input)
-        memory_usage = torch.cuda.max_memory_allocated() / 1024**4
+        memory_usage = torch.cuda.max_memory_allocated() / 1024**3
         # start = datetime.now()
         # _ = model(input)
         # print('Prediction time: ', datetime.now()-start)

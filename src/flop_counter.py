@@ -48,6 +48,7 @@ if __name__ == "__main__":
                 'memory_usage': memory_usage
             }
         )
+        torch.cuda.reset_max_memory_allocated()
         print("---------------------")
     df_data = pd.DataFrame(df_data)
     os.makedirs(os.path.dirname(config.out_path), exist_ok=True)

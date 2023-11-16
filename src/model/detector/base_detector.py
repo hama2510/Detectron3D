@@ -9,6 +9,18 @@ from model.module.efficientnet_v2 import EfficientNetV2S
 from model.module.convnext import ConvNextModel
 import pickle
 from collections import OrderedDict
+from model.module.fpn import FPN, FusedFPN, FusedFPNP3
+
+
+def get_fpn(name):
+    if name == "FusedFPN":
+        return FusedFPN
+    elif name == "FusedFPNP3":
+        return FusedFPNP3
+    elif name == "FPN":
+        return FPN
+    else:
+        raise ValueError(f'Not implemented {name}')
 
 
 class BaseDetector(nn.Module):
@@ -39,33 +51,39 @@ class BaseDetector(nn.Module):
 
     def create_model(self):
         detector = self.create_head()
+        fpn = get_fpn(self.config.model.fpn)
         if self.config.model.backbone_name == "mobilenet":
             model = detector(
                 feature_extractor=MobileNetv2(self.config.device, pretrained=True),
+                fpn=fpn,
                 num_cate=len(self.meta_data["categories"]),
                 num_attr=len(self.meta_data["attributes"]),
             )
         elif self.config.model.backbone_name == "resnet101":
             model = detector(
                 feature_extractor=ResNet101(self.config.device, pretrained=True),
+                fpn=fpn,
                 num_cate=len(self.meta_data["categories"]),
                 num_attr=len(self.meta_data["attributes"]),
             )
         elif self.config.model.backbone_name == "resnet101_dcn":
             model = detector(
                 feature_extractor=ResNet101DCN(),
+                fpn=fpn,
                 num_cate=len(self.meta_data["categories"]),
                 num_attr=len(self.meta_data["attributes"]),
             )
         elif self.config.model.backbone_name == "efficientnet_v2_s":
             model = detector(
                 feature_extractor=EfficientNetV2S(self.config.device, pretrained=True),
+                fpn=fpn,
                 num_cate=len(self.meta_data["categories"]),
                 num_attr=len(self.meta_data["attributes"]),
             )
         elif self.config.model.backbone_name == "convnext":
             model = detector(
                 feature_extractor=ConvNextModel(),
+                fpn=fpn,
                 num_cate=len(self.meta_data["categories"]),
                 num_attr=len(self.meta_data["attributes"]),
             )

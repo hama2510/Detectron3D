@@ -2,18 +2,15 @@ import torch
 import torch.nn as nn
 import numpy as np
 from model.network.fcos3d import FCOS3D
-from model.network.fcos3d_fused import FCOS3DFused, FCOS3DFusedP3
 from .base_detector import BaseDetector
 
 
 class FCOSDetector(BaseDetector):
     def create_head(self):
-        if self.config.model.head_name == "fcos3d":
+        if self.config.model.head_name == "FCOS3D":
             head = FCOS3D
-        elif self.config.model.head_name == "fcos3d_fused":
-            head = FCOS3DFused
-        elif self.config.model.head_name == "fcos3d_fused_p3":
-            head = FCOS3DFusedP3
+        else:
+            raise ValueError(f'Not implemeted {head}')
         return head
 
     def item_tensor_to_numpy(self, key, item):

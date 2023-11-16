@@ -5,16 +5,16 @@ from functools import partial
 from multiprocessing import Pool
 from datetime import datetime
 
-class CenterNetTransformerMaskFilter(CenterNetTransformer):
 
+class CenterNetTransformerMaskFilter(CenterNetTransformer):
     def find_neighbors(self, coord, shape, n=1):
         x, y = coord
         max_x, max_y = shape
         neighbors = []
 
-        for i in range(x-n, x+n+1):
-            for j in range(y-n, y+n+1):
-                if i>=0 and i<max_x and j>=0 and j<max_y and (x!=i or y!=j):
+        for i in range(x - n, x + n + 1):
+            for j in range(y - n, y + n + 1):
+                if i >= 0 and i < max_x and j >= 0 and j < max_y and (x != i or y != j):
                     neighbors.append([i, j])
         return neighbors
 
@@ -37,9 +37,9 @@ class CenterNetTransformerMaskFilter(CenterNetTransformer):
             for x in range(pred_score.shape[0]):
                 for y in range(pred_score.shape[1]):
                     sc = pred_score[x, y]
-                    if sc>det_thres:
-                        neighbors = self.find_neighbors((x,y), pred_score.shape)
-                        if all([sc>pred_score[nx, ny] for (nx, ny) in neighbors]):
+                    if sc > det_thres:
+                        neighbors = self.find_neighbors((x, y), pred_score.shape)
+                        if all([sc > pred_score[nx, ny] for (nx, ny) in neighbors]):
                             score_list.append([[x, y], sc])
             score_list.sort(key=lambda x: x[1], reverse=True)
             if topk > 0:
@@ -53,7 +53,7 @@ class CenterNetTransformerMaskFilter(CenterNetTransformer):
                 if self.config.data.rotation_encode == "pi_and_minus_pi":
                     rotation = rotation_map[idx[0], idx[1], 0] * np.pi * 2.0
                 else:
-                    raise ValueError('Not support other than pi_and_minus_pi')
+                    raise ValueError("Not support other than pi_and_minus_pi")
 
                 box = self.gen_box(
                     sample_token,
@@ -71,13 +71,16 @@ class CenterNetTransformerMaskFilter(CenterNetTransformer):
                 boxes.append(box)
         return boxes, calib_matrix
 
-    
     def transform_predicts(self, preds, target=False):
         boxes = []
         if self.config.num_workers <= 1:
             for pred in preds:
                 boxes.extend(
-                    self.transform_predict(pred, det_thres=self.config.demo.det_thres, topk=self.config.demo.topk)
+                    self.transform_predict(
+                        pred,
+                        det_thres=self.config.demo.det_thres,
+                        topk=self.config.demo.topk,
+                    )
                 )
         else:
             if not target:
@@ -88,7 +91,11 @@ class CenterNetTransformerMaskFilter(CenterNetTransformer):
             pool = Pool(self.config.num_workers)
             data = list(
                 pool.imap(
-                    partial(func, det_thres=self.config.demo.det_thres, topk=self.config.demo.topk),
+                    partial(
+                        func,
+                        det_thres=self.config.demo.det_thres,
+                        topk=self.config.demo.topk,
+                    ),
                     preds,
                 )
             )
@@ -97,5 +104,5 @@ class CenterNetTransformerMaskFilter(CenterNetTransformer):
             print("Transforming prediction at ", datetime.now() - start)
             for item, calib_matrix in data:
                 boxes.extend(item)
-            print('Total {} boxes'.format(len(boxes)))
+            print("Total {} boxes".format(len(boxes)))
         return boxes

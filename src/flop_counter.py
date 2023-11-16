@@ -7,11 +7,11 @@ from flopth import flopth
 from thop import profile
 import numpy as np
 import pandas as pd
+import os, sys
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--config',type=str, 
-                        help='path_to_config_file')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--config", type=str, help="path_to_config_file")
     args = parser.parse_args()
     config = OmegaConf.load(args.config)
     df_data = []
@@ -25,17 +25,31 @@ if __name__ == '__main__':
         # flops, params = flopth(model, in_size=((3, 450, 800)))
         # flops, params = flopth(model, in_size=((3, 900, 1600)))
         # print(flops, params)
+        h, w = model_config.model.input_shape
+        input = torch.randn(1, 3, h, w).to(model_config.device)
+        flops, params = profile(model, inputs=(input,))
+        flops = np.round(flops / 1000000000, 2)
+        params = np.round(params / 1000000, 2)
 
-        input = torch.randn(1, 3, 450, 800).to(model_config.device)
-        flops, params = profile(model, inputs=(input, ))
-        flops = np.round(flops/1000000000, 2)
-        params = np.round(params/1000000, 2)
-        # print(f'flops={flops}G, params={params}M')
-        # input = torch.randn(1, 3, 450, 800).to(model_config.device)
+        output = model(input)
+        memory_usage = torch.cuda.max_memory_allocated() / 1024**4
         # start = datetime.now()
         # _ = model(input)
         # print('Prediction time: ', datetime.now()-start)
-        df_data.append({'model':model_config.model.exp, 'flops':f'{flops}G', 'params':f'{params}M'})
-        print('---------------------')
+        df_data.append(
+            {
+                "name": model_config.model.exp,
+                "head": model_config.model.head_name,
+                "fpn": model_config.model.fpn,
+                "backbone": model_config.model.backbone_name,
+                "input_size": (w, h),
+                "flops": f"{flops}G",
+                "params": f"{params}M",
+                'memory_usage': memory_usage
+            }
+        )
+        print("---------------------")
     df_data = pd.DataFrame(df_data)
+    os.makedirs(os.path.dirname(config.out_path), exist_ok=True)
+    df_data.to_csv(config.out_path, index=False)
     print(df_data)

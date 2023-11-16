@@ -1,0 +1,83 @@
+device: cuda:0
+out_path: /home/kiennt/KienNT/research/Detectron3D/exp/model_summary.csv
+data:
+    meta_data: /home/kiennt/KienNT/research/data/nuScenes/pickle/mini/meta.pkl
+models:
+    - 
+        exp: resnet101_fpn
+        input_shape: [900, 1600]
+        detector_name: FCOSDetector
+        head_name: FCOS3D
+        fpn: FPN
+        backbone_name: resnet101
+        transform: FCOSTransformer
+        eval: true
+    - 
+        exp: resnet101_fpn_fused
+        input_shape: [450, 800]
+        detector_name: FCOSDetector
+        head_name: FCOS3D
+        fpn: FusedFPN
+        backbone_name: resnet101
+        transform: FCOSTransformer
+        eval: true
+#     - 
+#         exp: resnet101_fpn_fused_p3
+#         detector_name: FCOSDetector
+#         head_name: FCOS3D
+#         fpn: FusedFPNP3
+#         backbone_name: resnet101
+#         transform: FCOSTransformer
+#         eval: true
+#     - 
+#         exp: resnet101_centernet
+#         detector_name: CenterNet3Detector
+#         head_name: CenterNet3D
+#         fpn: FusedFPN
+#         backbone_name: resnet101
+#         transform: CenterNetTransformer
+#         eval: true
+    - 
+        exp: efficientnet_v2_s
+        input_shape: [450, 800]
+        detector_name: CenterNet3Detector
+        head_name: CenterNet3D
+        fpn: FusedFPN
+        backbone_name: efficientnet_v2_s
+        transform: CenterNetTransformer
+        eval: true
+    - 
+        exp: efficientnet_v2_s_p3
+        input_shape: [450, 800]
+        detector_name: CenterNet3Detector
+        head_name: CenterNet3D
+        fpn: FusedFPNP3
+        backbone_name: efficientnet_v2_s
+        transform: CenterNetTransformer
+        eval: true
+    - 
+        exp: mobilenet
+        input_shape: [450, 800]
+        detector_name: CenterNet3Detector
+        head_name: CenterNet3D
+        fpn: FusedFPN
+        backbone_name: mobilenet
+        transform: CenterNetTransformer
+        eval: true
+#     - 
+#         exp: convnext
+#         detector_name: CenterNet3Detector
+#         head_name: CenterNet3D
+#         fpn: FusedFPN
+#         backbone_name: convnext
+#         transform: CenterNetTransformer
+#         eval: true
+    - 
+        exp: efficientnet_v2_s_shallow
+        input_shape: [450, 800]
+        detector_name: CenterNet3Detector
+        head_name: CenterNet3DShallow
+        fpn: FusedFPN
+        backbone_name: efficientnet_v2_s
+        transform: CenterNetTransformer
+        eval: true

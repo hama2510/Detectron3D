@@ -8,6 +8,7 @@ from thop import profile
 import numpy as np
 import pandas as pd
 import os, sys
+import torch.autograd.profiler as profiler
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -22,20 +23,24 @@ if __name__ == "__main__":
         model = model.to(model_config.device)
         model.eval()
         print(model_config.model.exp)
-        # flops, params = flopth(model, in_size=((3, 450, 800)))
-        # flops, params = flopth(model, in_size=((3, 900, 1600)))
-        # print(flops, params)
         h, w = model_config.model.input_shape
         input = torch.randn(1, 3, h, w).to(model_config.device)
         flops, params = profile(model, inputs=(input,))
         flops = np.round(flops / 1000000000, 2)
         params = np.round(params / 1000000, 2)
 
-        output = model(input)
-        memory_usage = torch.cuda.max_memory_allocated() / 1024**3
-        # start = datetime.now()
-        # _ = model(input)
-        # print('Prediction time: ', datetime.now()-start)
+        with profiler.profile(record_shapes=True, use_cuda=True) as prof:
+            with profiler.record_function("model_inference"):
+                output = model(input)
+
+        # Print the memory profile
+        time = prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10).split('\n')[-2].split('Self CUDA time total: ')[-1]
+
+        # torch.cuda.reset_peak_memory_stats()
+        # output = model(input)
+        # print(torch.cuda.memory_summary())
+        # memory_usage = torch.cuda.max_memory_allocated() / 1024**3
+
         df_data.append(
             {
                 "name": model_config.model.exp,
@@ -45,7 +50,7 @@ if __name__ == "__main__":
                 "input_size": (w, h),
                 "flops": f"{flops}G",
                 "params": f"{params}M",
-                'memory_usage': memory_usage
+                'processing_time': time
             }
         )
         torch.cuda.reset_max_memory_allocated()

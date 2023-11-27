@@ -16,6 +16,7 @@ from model.detector.detector_factory import get_detector
 from model.transform.transform_factory import get_transform
 from criterion.criterion_factory import get_criterion
 from data.dataset_factory import get_dataset
+from torch.optim import ReduceLROnPlateau
 
 
 random.seed(42)
@@ -32,6 +33,7 @@ class RunTask:
         self.model = self.init_model()
         self.model = self.model.to(conf.device)
         self.optimizer = self.init_optimizer()
+        self.scheduler = ReduceLROnPlateau(self.optimizer, mode='max', factor=0.2, patience=10)
         self.criterion = self.init_criterion()
         self.transformer = self.init_transformer()
 
@@ -48,7 +50,6 @@ class RunTask:
 
     def init_criterion(self):
         criterion = get_criterion(self.conf.train.loss)(self.conf.device)
-        # criterion = criterion.to(self.conf.device)
         return criterion
 
     def init_transformer(self):
@@ -274,5 +275,6 @@ if __name__ == "__main__":
                     logs[id]["best_nds"] = nds
                 if mAP > logs[id]["best_mAP"]:
                     logs[id]["best_mAP"] = mAP
+                task.scheduler.step(mAP)
                 del task
             print(datetime.now() - start)

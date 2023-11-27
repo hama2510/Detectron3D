@@ -16,7 +16,7 @@ from model.detector.detector_factory import get_detector
 from model.transform.transform_factory import get_transform
 from criterion.criterion_factory import get_criterion
 from data.dataset_factory import get_dataset
-from torch.optim import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 random.seed(42)

@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from collections import OrderedDict
 import math
-from base_losses import BaseLoss
+from .base_losses import BaseLoss
 # class Criterion(nn.Module):
 #     def __init__(self, device, alpha=0.2, gamma=2):
 #         super().__init__()

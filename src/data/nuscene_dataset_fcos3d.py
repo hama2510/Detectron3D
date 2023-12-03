@@ -6,15 +6,15 @@ import numpy as np
 
 sys.path.append("..")
 from utils.camera import *
-from .nuscene_dataset import *
+from .nuscene_dataset import NusceneDataset, check_box_and_feature_map_level, is_valid_box, is_near_center
 
-STRIDE_LIST = [16]
-M_LIST = [0, np.inf]
+STRIDE_LIST = [8, 16, 32, 64, 128]
+M_LIST = [0, 64, 128, 256, 512, np.inf]
 RADIUS = 1.5
 
 
 class NusceneDatasetFCOS3D(NusceneDataset):
-    def __init__(self, data_file, config, return_target=True):
+    def __init__(self, data_file, config, return_target=True, is_train=True, **kwargs):
         super().__init__(data_file, config, return_target)
         self.stride_list = STRIDE_LIST
         self.m_list = M_LIST
@@ -57,15 +57,15 @@ class NusceneDatasetFCOS3D(NusceneDataset):
                             int(ann["box_2d"][2] * self.resize),
                         ]
                         box_2d = np.asarray(box_2d, dtype=object)
-                        # pass_cond = is_near_center([x, y],  box_2d//stride)
-                        pass_cond = is_center([x, y], box_2d // stride)
+                        pass_cond = is_near_center([x, y],  box_2d//stride)
+                        # pass_cond = is_center([x, y], box_2d // stride)
                         # pass_cond = is_positive_location(
                         #     [x, y], box_2d, stride, self.radius
                         # )
                         pass_cond = pass_cond and is_valid_box(
                             box_2d, (img_shape[1], img_shape[0])
                         )
-                        # pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
+                        pass_cond = pass_cond and check_box_and_feature_map_level([x, y], ann['box_2d'], stride, self.m_list, self.stride_list)
                         if pass_cond:
                             new_ann = ann.copy()
                             new_ann["box_2d"] = box_2d

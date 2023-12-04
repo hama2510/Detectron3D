@@ -4,7 +4,7 @@ from .base_transform import BaseTransformer
 
 
 class FCOSTransformer(BaseTransformer):
-    def transform_predict(self, pred, det_thres=0.05):
+    def transform_predict(self, pred, det_thres=0.05, **kwargs):
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]
@@ -60,7 +60,7 @@ class FCOSTransformer(BaseTransformer):
                 boxes.append(box)
         return boxes, calib_matrix
 
-    def transform_target(self, pred, det_thres=0.05):
+    def transform_target(self, pred, det_thres=0.05, **kwargs):
         boxes = []
         sample_token = pred["sample_token"]
         calib_matrix = pred["calibration_matrix"]

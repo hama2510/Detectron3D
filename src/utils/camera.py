@@ -1,9 +1,6 @@
 import cv2 as cv
-import os
 from pyquaternion import Quaternion
-# from scipy.spatial.transform import Rotation as quaternion_transformer
 import numpy as np
-from nuscenes.utils.geometry_utils import view_points
 from nuscenes.utils.data_classes import Box
 
 def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=True):
@@ -27,8 +24,11 @@ def gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrat
     else:
         return intrinsic
 
-def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True):
+def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True, yaw_only=False):
     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
+    if yaw_only:
+        sensor_R = Quaternion(axis=[0,0,1], angle=Quaternion(matrix=sensor_R).yaw_pitch_roll[0]).rotation_matrix
+        ego_R = Quaternion(axis=[0,0,1], angle=Quaternion(matrix=ego_R).yaw_pitch_roll[0]).rotation_matrix
     coord_3d = np.array(coord_3d)
     coord_3d = np.append(coord_3d, 1)
     
@@ -38,9 +38,24 @@ def coord_3d_to_2d(coord_3d, calibration_matrix, calibrated=True):
         coord_2d = intrinsic @ coord_3d
     else:
         intrinsic, sensor_extrinsic, ego_extrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
-        coord_2d = intrinsic @ sensor_extrinsic @ ego_extrinsic @ coord_3d
+        coord_2d = intrinsic @ (sensor_extrinsic @ (ego_extrinsic @ coord_3d))
     coord_2d = (coord_2d / coord_2d[[-2]])[:2].T.astype(int)
     return coord_2d
+
+# def coord_3d_to_2d_by_yaw(coord_3d, calibration_matrix, calibrated=True):
+#     intrinsic, sensor_R, sensor_t, ego_R, ego_t = calibration_matrix['camera_intrinsic'], calibration_matrix['sensor_R'], calibration_matrix['sensor_t'], calibration_matrix['ego_R'], calibration_matrix['ego_t']
+#     coord_3d = np.array(coord_3d)
+#     coord_3d = np.append(coord_3d, 1)
+    
+#     # no need extrinsic matrix because the coordinate has been rotated and translated
+#     if calibrated:
+#         intrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
+#         coord_2d = intrinsic @ coord_3d
+#     else:
+#         intrinsic, sensor_extrinsic, ego_extrinsic = gen_calibration_matrix(intrinsic, sensor_R, sensor_t, ego_R, ego_t, calibrated=calibrated)
+#         coord_2d = intrinsic @ sensor_extrinsic @ ego_extrinsic @ coord_3d
+#     coord_2d = (coord_2d / coord_2d[[-2]])[:2].T.astype(int)
+#     return coord_2d
 
 def box_3d_to_2d(box, calibration_matrix, calibrated=True):
     c = coord_3d_to_2d(box.center, calibration_matrix)
@@ -78,11 +93,36 @@ def coord_2d_to_3d(coord_2d, depth, calibration_matrix, calibrated=True):
     coord_3d = coord_3d[:3].T
     return coord_3d
 
-def sensor_coord_to_real_coord(coord, size, rotation, calibration_matrix):
+
+def rotate_box_by_yaw(box, quaternion):
+    yaw = Quaternion(axis=[0,0,1], angle=quaternion.yaw_pitch_roll[0])
+    box.center = np.dot(quaternion.rotation_matrix, box.center)
+    box.orientation = yaw * box.orientation
+    box.velocity = np.dot(quaternion.rotation_matrix, box.velocity)
+
+    return box 
+
+def sensor_coord_to_real_coord(coord, size, rotation, calibration_matrix, rotate_yaw_only=False):
     sensor_R_quaternion, sensor_t, ego_R_quaternion, ego_t = calibration_matrix['sensor_R_quaternion'], calibration_matrix['sensor_t'], calibration_matrix['ego_R_quaternion'], calibration_matrix['ego_t']
-    box = Box(coord, size, rotation)
-    box.rotate(Quaternion(sensor_R_quaternion))
-    box.translate(np.array(sensor_t))
-    box.rotate(Quaternion(ego_R_quaternion))
-    box.translate(np.array(ego_t))
-    return box.center
+    box = Box(center=coord, size=size, orientation=rotation)
+    if not rotate_yaw_only:
+        box.rotate(Quaternion(sensor_R_quaternion))
+        box.translate(np.array(sensor_t))
+        box.rotate(Quaternion(ego_R_quaternion))
+        box.translate(np.array(ego_t))
+    else:
+        box = rotate_box_by_yaw(box, Quaternion(sensor_R_quaternion))
+        box.translate(np.array(sensor_t))
+        box = rotate_box_by_yaw(box, Quaternion(ego_R_quaternion))
+        box.translate(np.array(ego_t))
+    return box
+
+# def sensor_coord_to_real_coord_y_axis(coord, size, rotation, calibration_matrix):
+#     sensor_R_quaternion, sensor_t, ego_R_quaternion, ego_t = calibration_matrix['sensor_R_quaternion'], calibration_matrix['sensor_t'], calibration_matrix['ego_R_quaternion'], calibration_matrix['ego_t']
+#     box = Box(coord, size, rotation)
+#     box = rotate_box(box, Quaternion(sensor_R_quaternion))
+#     box.translate(-np.array(sensor_t))
+#     box = rotate_box(box, Quaternion(ego_R_quaternion))
+#     box.translate(-np.array(ego_t))
+#     return box
+

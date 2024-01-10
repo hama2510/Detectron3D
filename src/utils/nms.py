@@ -17,7 +17,6 @@ def rotated_nms(boxes, calibration_matrix,  nms_thres=0.3):
         scores.append(box['detection_score'])
     boxes_2d = np.asarray(boxes_2d)
     scores = np.asarray(scores)
-#     keep_indices = ml3d.ops.nms(boxes_2d, scores, nms_thres)
     _, keep_indices = nms_rotated(torch.tensor(boxes_2d).cuda(), torch.tensor(scores).cuda(), iou_threshold=nms_thres)
 #     _, keep_indices = nms_rotated(torch.tensor(boxes_2d), torch.tensor(scores).cuda(), iou_threshold=nms_thres)
     if not keep_indices is None:
